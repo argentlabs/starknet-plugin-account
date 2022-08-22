@@ -1,0 +1,2 @@
+cairo-lang>=0.9.1
+cairo-nile>=0.8.0
