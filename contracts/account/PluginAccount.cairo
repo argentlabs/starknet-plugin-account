@@ -23,6 +23,7 @@ const VERSION = '0.0.1'
 const IS_VALID_SIGNATURE_SELECTOR = 1138073982574099226972715907883430523600275391887289231447128254784345409857
 const SUPPORTS_INTERFACE_SELECTOR = 1184015894760294494673613438913361435336722154500302038630992932234692784845
 const USE_PLUGIN_SELECTOR = 1121675007639292412441492001821602921366030142137563176027248191276862353634
+const INITIALIZE_SELECTOR = 215307247182100370520050591091822763712463273430149262739280891880522753123
 const ERC165_ACCOUNT_INTERFACE = 0xf10dbd44
 
 ####################
@@ -64,6 +65,37 @@ end
 ####################
 # EXTERNAL FUNCTIONS
 ####################
+
+@external
+func initialize{
+        syscall_ptr : felt*,
+        pedersen_ptr : HashBuiltin*,
+        range_check_ptr
+    }(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*):
+    let (is_initialized) = _default_plugin.read()
+    with_attr error_message("account already initialized"):
+        assert is_initialized = FALSE
+    end
+
+    # add plugin
+    with_attr error_message("plugin cannot be null"):
+        assert_not_zero(plugin)
+    end
+    _plugins.write(plugin, 1)
+
+    library_call(
+        class_hash=plugin,
+        function_selector=INITIALIZE_SELECTOR,
+        calldata_size=plugin_calldata_len,
+        calldata=plugin_calldata)
+
+    _default_plugin.write(plugin)
+
+    let (self) = get_contract_address()
+    account_created.emit(self)
+
+    return ()
+end
 
 @external
 @raw_output
@@ -172,6 +204,25 @@ func execute_on_plugin{
         calldata_size=calldata_len,
         calldata=calldata)
     return()
+end
+
+@external
+func set_default_plugin{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        range_check_ptr
+    }(plugin: felt):
+    # only called via execute
+    assert_only_self()
+
+    # add plugin
+    with_attr error_message("plugin cannot be null"):
+        assert_not_zero(plugin)
+    end
+
+    _default_plugin.write(plugin)
+
+    return ()
 end
 
 @external
