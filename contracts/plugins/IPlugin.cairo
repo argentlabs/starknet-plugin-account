@@ -1,10 +1,13 @@
 %lang starknet
 
-from contracts.utils.structs import CallArray
+from contracts.account.library import CallArray
 
 @contract_interface
 namespace IPlugin {
-    // Method to call during validation
+
+    func initialize(data_len: felt, data: felt*) {
+    }
+
     func validate(
         plugin_data_len: felt,
         plugin_data: felt*,
