@@ -12,15 +12,28 @@ func StarkSigner_public_key() -> (res: felt) {
 }
 
 @external
-func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(data_len: felt, data: felt*) {
+func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin_data_len: felt, plugin_data: felt*) {
     let (is_initialized) = StarkSigner_public_key.read();
-    with_attr error_message("starksigner: account already initialized") {
+    with_attr error_message("starksigner: already initialized") {
         assert is_initialized = 0;
     }
     with_attr error_message("starksigner: initialise failed") {
-        assert data_len = 1;
+        assert plugin_data_len = 1;
     }
-    StarkSigner_public_key.write(data[0]);
+    StarkSigner_public_key.write(plugin_data[0]);
+    return ();
+}
+
+@external
+func setPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    public_key: felt
+) {
+    assert_only_self()
+    
+    with_attr error_message("starksigner: public key can not be zero") {
+        assert_not_zero(public_key);
+    }
+    StarkSigner_public_key.write(public_key);
     return ();
 }
 
@@ -30,17 +43,6 @@ func getPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 ) {
     let (public_key) = StarkSigner_public_key.read();
     return (public_key=public_key);
-}
-
-@external
-func setPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key: felt
-) {
-    with_attr error_message("starksigner: public key can not be zero") {
-        assert_not_zero(public_key);
-    }
-    StarkSigner_public_key.write(public_key);
-    return ();
 }
 
 @view
@@ -62,7 +64,7 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (FALSE,);
 }
 
-@external
+@view
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
@@ -101,4 +103,13 @@ func is_valid_signature{
         signature_s=sig_s);
 
     return (is_valid=TRUE);
+}
+
+func assert_only_self{syscall_ptr: felt*}() -> () {
+    let (self) = get_contract_address();
+    let (caller_address) = get_caller_address();
+    with_attr error_message("account: only self") {
+        assert self = caller_address;
+    }
+    return ();
 }

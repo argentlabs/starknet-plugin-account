@@ -64,7 +64,7 @@ func _plugins(plugin: felt) -> (res: felt) {
 }
 
 /////////////////////
-// ACCOUNT
+// PROTOCOL
 /////////////////////
 
 @external
@@ -143,68 +143,48 @@ func __validate_declare__{
     return ();
 }
 
-@view
-func isValidSignature{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
-}(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
-    alloc_locals;
-    let (default_plugin) = _default_plugin.read();
-
-    let (calldata: felt*) = alloc();
-    assert calldata[0] = hash;
-    assert calldata[1] = sig_len;
-    memcpy(calldata + 2, sig, sig_len);
-
-    let (retdata_size: felt, retdata: felt*) = library_call(
-        class_hash=default_plugin,
-        function_selector=IS_VALID_SIGNATURE_SELECTOR,
-        calldata_size=2 + sig_len,
-        calldata=calldata,
-    );
-
-    assert retdata_size = 1;
-    return (isValid=retdata[0]);
-}
-
-@view
-func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    interfaceId: felt
-) -> (success: felt) {
-    // 165
-    if (interfaceId == 0x01ffc9a7) {
-        return (TRUE,);
-    }
-    // IAccount
-    if (interfaceId == ERC165_ACCOUNT_INTERFACE_ID) {
-        return (TRUE,);
-    }
-
-    let (default_plugin) = _default_plugin.read();
-
-    let (calldata: felt*) = alloc();
-    assert calldata[0] = interfaceId;
-
-    let (retdata_size: felt, retdata: felt*) = library_call(
-        class_hash=default_plugin,
-        function_selector=SUPPORTS_INTERFACE_SELECTOR,
-        calldata_size=1,
-        calldata=calldata,
-    );
-
-    assert retdata_size = 1;
-    return (success=retdata[0]);
-}
-
 /////////////////////
-// PLUGIN
+// EXTERNAL FUNCTIONS
 /////////////////////
 
 @external
+func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
+) {
+    let (is_initialized) = _default_plugin.read();
+    with_attr error_message("account: already initialized") {
+        assert is_initialized = FALSE;
+    }
+
+    set_default_plugin(plugin, plugin_calldata_len, plugin_calldata);
+    _plugins.write(plugin, 1);
+
+    let (self) = get_contract_address();
+    account_created.emit(self);
+
+    return ();
+}
+
+@external
+@raw_input
+@raw_output
+func __default__{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    selector: felt, calldata_size: felt, calldata: felt*
+) -> (retdata_size: felt, retdata: felt*) {    
+    let (current_plugin) = get_current_plugin();
+    let (retdata_size: felt, retdata: felt*) = library_call(
+        class_hash=current_plugin,
+        function_selector=selector,
+        calldata_size=calldata_size,
+        calldata=calldata,
+    );
+    return (retdata_size=retdata_size, retdata=retdata);
+}
+
+@external
 func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) {
-    // only called via execute
     assert_only_self();
 
-    // add plugin
     with_attr error_message("plugin cannot be null") {
         assert_not_zero(plugin);
     }
@@ -258,6 +238,62 @@ func setDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return ();
 }
 
+/////////////////////
+// VIEW FUNCTIONS
+/////////////////////
+
+@view
+func isValidSignature{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+}(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
+    alloc_locals;
+    let (default_plugin) = _default_plugin.read();
+
+    let (calldata: felt*) = alloc();
+    assert calldata[0] = hash;
+    assert calldata[1] = sig_len;
+    memcpy(calldata + 2, sig, sig_len);
+
+    let (retdata_size: felt, retdata: felt*) = library_call(
+        class_hash=default_plugin,
+        function_selector=IS_VALID_SIGNATURE_SELECTOR,
+        calldata_size=2 + sig_len,
+        calldata=calldata,
+    );
+
+    assert retdata_size = 1;
+    return (isValid=retdata[0]);
+}
+
+@view
+func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    interfaceId: felt
+) -> (success: felt) {
+    // 165
+    if (interfaceId == 0x01ffc9a7) {
+        return (TRUE,);
+    }
+    // IAccount
+    if (interfaceId == ERC165_ACCOUNT_INTERFACE_ID) {
+        return (TRUE,);
+    }
+
+    let (default_plugin) = _default_plugin.read();
+
+    let (calldata: felt*) = alloc();
+    assert calldata[0] = interfaceId;
+
+    let (retdata_size: felt, retdata: felt*) = library_call(
+        class_hash=default_plugin,
+        function_selector=SUPPORTS_INTERFACE_SELECTOR,
+        calldata_size=1,
+        calldata=calldata,
+    );
+
+    assert retdata_size = 1;
+    return (success=retdata[0]);
+}
+
 @view
 func isPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) -> (
     success: felt
@@ -266,48 +302,13 @@ func isPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(p
     return (success=res);
 }
 
-/////////////////////
-// EXTERNAL FUNCTIONS
-/////////////////////
-
-@external
-func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
+@view
+func getDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    plugin: felt
 ) {
-    let (is_initialized) = _default_plugin.read();
-    with_attr error_message("account: already initialized") {
-        assert is_initialized = FALSE;
-    }
-
-    set_default_plugin(plugin, plugin_calldata_len, plugin_calldata);
-    _plugins.write(plugin, 1);
-
-    let (self) = get_contract_address();
-    account_created.emit(self);
-
-    return ();
+    let (res) = _default_plugin.read();
+    return (plugin=res);
 }
-
-@external
-@raw_input
-@raw_output
-func __default__{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    selector: felt, calldata_size: felt, calldata: felt*
-) -> (retdata_size: felt, retdata: felt*) {
-    let (current_plugin) = get_current_plugin();
-
-    let (retdata_size: felt, retdata: felt*) = library_call(
-        class_hash=current_plugin,
-        function_selector=selector,
-        calldata_size=calldata_size,
-        calldata=calldata,
-    );
-    return (retdata_size=retdata_size, retdata=retdata);
-}
-
-/////////////////////
-// VIEW FUNCTIONS
-/////////////////////
 
 @view
 func getName() -> (name: felt) {
@@ -412,7 +413,7 @@ func set_default_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     with_attr error_message("account: plugin cannot be null") {
         assert_not_zero(plugin);
     }
-
+    // initialise the plugin
     library_call(
         class_hash=plugin,
         function_selector=INITIALIZE_SELECTOR,
@@ -421,7 +422,7 @@ func set_default_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     );
 
     _default_plugin.write(plugin);
-    
+
     return ();
 }
 
@@ -439,7 +440,7 @@ func get_current_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func assert_only_self{syscall_ptr: felt*}() -> () {
     let (self) = get_contract_address();
     let (caller_address) = get_caller_address();
-    with_attr error_message("must be called via execute") {
+    with_attr error_message("account: only self") {
         assert self = caller_address;
     }
     return ();
@@ -447,7 +448,7 @@ func assert_only_self{syscall_ptr: felt*}() -> () {
 
 func assert_non_reentrant{syscall_ptr: felt*}() -> () {
     let (caller) = get_caller_address();
-    with_attr error_message("no reentrant call") {
+    with_attr error_message("account: no reentrant call") {
         assert caller = 0;
     }
     return ();
