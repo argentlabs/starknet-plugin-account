@@ -152,7 +152,7 @@ func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
     let (is_initialized) = _default_plugin.read();
-    with_attr error_message("account: already initialized") {
+    with_attr error_message("PluginAccount: already initialized") {
         assert is_initialized = FALSE;
     }
 
@@ -185,7 +185,7 @@ func __default__{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) {
     assert_only_self();
 
-    with_attr error_message("plugin cannot be null") {
+    with_attr error_message("PluginAccount: plugin cannot be null") {
         assert_not_zero(plugin);
     }
     _plugins.write(plugin, 1);
@@ -197,12 +197,12 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert_only_self();
 
     let (is_plugin) = _plugins.read(plugin);
-    with_attr error_message("account: plugin does not exist") {
+    with_attr error_message("PluginAccount: plugin does not exist") {
         assert_not_zero(is_plugin);
     }
 
     // cannot remove default plugin
-    with_attr error_message("cannot remove default plugin") {
+    with_attr error_message("PluginAccount: cannot remove default plugin") {
         let (default_plugin) = _default_plugin.read();
         assert_not_equal(plugin, default_plugin);
     }
@@ -219,7 +219,7 @@ func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     assert_only_self();
     
     let (is_plugin) = _plugins.read(plugin);
-    with_attr error_message("account: plugin does not exist") {
+    with_attr error_message("PluginAccount: plugin does not exist") {
         assert_not_zero(is_plugin);
     }
 
@@ -333,7 +333,7 @@ func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     if (call_array[0].selector == USE_PLUGIN_SELECTOR) {
         let plugin_id = calldata[call_array[0].data_offset];
         let (is_plugin) = _plugins.read(plugin_id);
-        with_attr error_message("account: unknown plugin") {
+        with_attr error_message("PluginAccount: unknown plugin") {
             assert_not_zero(is_plugin);
         }
         memcpy(plugin_data, calldata + call_array[0].data_offset + 1, call_array[0].data_len - 1);
@@ -410,7 +410,7 @@ func execute_with_plugin{
 func set_default_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
-    with_attr error_message("account: plugin cannot be null") {
+    with_attr error_message("PluginAccount: plugin cannot be null") {
         assert_not_zero(plugin);
     }
     // initialise the plugin
@@ -440,7 +440,7 @@ func get_current_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func assert_only_self{syscall_ptr: felt*}() -> () {
     let (self) = get_contract_address();
     let (caller_address) = get_caller_address();
-    with_attr error_message("account: only self") {
+    with_attr error_message("PluginAccount: only self") {
         assert self = caller_address;
     }
     return ();
@@ -448,7 +448,7 @@ func assert_only_self{syscall_ptr: felt*}() -> () {
 
 func assert_non_reentrant{syscall_ptr: felt*}() -> () {
     let (caller) = get_caller_address();
-    with_attr error_message("account: no reentrant call") {
+    with_attr error_message("PluginAccount: no reentrant call") {
         assert caller = 0;
     }
     return ();
@@ -456,7 +456,7 @@ func assert_non_reentrant{syscall_ptr: felt*}() -> () {
 
 func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
     let (default_plugin) = _default_plugin.read();
-    with_attr error_message("account: account not initialized") {
+    with_attr error_message("PluginAccount: account not initialized") {
         assert_not_zero(default_plugin);
     }
     return ();

@@ -14,10 +14,10 @@ func StarkSigner_public_key() -> (res: felt) {
 @external
 func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin_data_len: felt, plugin_data: felt*) {
     let (is_initialized) = StarkSigner_public_key.read();
-    with_attr error_message("starksigner: already initialized") {
+    with_attr error_message("StarkSigner: already initialized") {
         assert is_initialized = 0;
     }
-    with_attr error_message("starksigner: initialise failed") {
+    with_attr error_message("StarkSigner: initialise failed") {
         assert plugin_data_len = 1;
     }
     StarkSigner_public_key.write(plugin_data[0]);
@@ -29,8 +29,8 @@ func setPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     public_key: felt
 ) {
     assert_only_self()
-    
-    with_attr error_message("starksigner: public key can not be zero") {
+
+    with_attr error_message("StarkSigner: public key can not be zero") {
         assert_not_zero(public_key);
     }
     StarkSigner_public_key.write(public_key);
@@ -108,7 +108,7 @@ func is_valid_signature{
 func assert_only_self{syscall_ptr: felt*}() -> () {
     let (self) = get_contract_address();
     let (caller_address) = get_caller_address();
-    with_attr error_message("account: only self") {
+    with_attr error_message("StarkSigner: only self") {
         assert self = caller_address;
     }
     return ();
