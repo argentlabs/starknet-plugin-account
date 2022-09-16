@@ -4,6 +4,7 @@ from starkware.starknet.testing.starknet import Starknet
 from utils import str_to_felt, cached_contract, compile, StarkSigner
 
 signer = StarkSigner(1234)
+new_signer = StarkSigner(5678)
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -56,3 +57,11 @@ async def test_initialise(contract_factory):
     execution_info = await account_as_plugin.getPublicKey().call()
     assert execution_info.result == (signer.public_key,)
 
+@pytest.mark.asyncio
+async def test_change_public_key(contract_factory):
+    account, account_as_plugin, sts_plugin_hash = contract_factory
+
+    execution_info = await signer.send_transaction(account, [(account.contract_address, 'setPublicKey', [new_signer.public_key])])
+
+    execution_info = await account_as_plugin.getPublicKey().call()
+    assert execution_info.result == (new_signer.public_key,)

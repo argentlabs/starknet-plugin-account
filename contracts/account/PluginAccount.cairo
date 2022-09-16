@@ -197,7 +197,7 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert_only_self();
 
     let (is_plugin) = _plugins.read(plugin);
-    with_attr error_message("PluginAccount: plugin does not exist") {
+    with_attr error_message("PluginAccount: unknown plugin") {
         assert_not_zero(is_plugin);
     }
 
@@ -209,23 +209,6 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     _plugins.write(plugin, 0);
 
-    return ();
-}
-
-@external
-func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
-) {
-    assert_only_self();
-    
-    let (is_plugin) = _plugins.read(plugin);
-    with_attr error_message("PluginAccount: plugin does not exist") {
-        assert_not_zero(is_plugin);
-    }
-
-    library_call(
-        class_hash=plugin, function_selector=selector, calldata_size=calldata_len, calldata=calldata
-    );
     return ();
 }
 
@@ -300,6 +283,23 @@ func isPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(p
 ) {
     let (res) = _plugins.read(plugin);
     return (success=res);
+}
+
+@view
+func readOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
+) {
+    let (is_plugin) = _plugins.read(plugin)
+    with_attr error_message("PluginAccount: unknown plugin") {
+        assert_not_zero(is_plugin);
+    }
+    let (retdata_size: felt, retdata: felt*) = library_call(
+        class_hash=plugin,
+        function_selector=selector,
+        calldata_size=plugin_calldata_len,
+        calldata=plugin_calldata,
+    );
+    return (retdata_size=retdata_size, retdata=retdata);
 }
 
 @view

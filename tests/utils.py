@@ -3,11 +3,14 @@ from starkware.crypto.signature.signature import private_to_stark_key, sign
 from starkware.starknet.services.api.contract_class import ContractClass
 from starkware.starknet.testing.contract import StarknetContract
 from starkware.starknet.testing.state import StarknetState
+from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.core.os.transaction_hash.transaction_hash import calculate_transaction_hash_common, TransactionHashPrefix
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction, Declare
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.compiler.compile import compile_starknet_files
 from starkware.starknet.compiler.compile import get_selector_from_name
+
+TRANSACTION_VERSION = 1
 
 def str_to_felt(text: str) -> int:
     b_text = bytes(text, 'UTF-8')

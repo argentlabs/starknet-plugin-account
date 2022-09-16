@@ -9,20 +9,22 @@ namespace IPluginAccount {
     // Plugin
     /////////////////////
 
-    // Add a plugin
     func addPlugin(plugin: felt) {
     }
 
-    // Remove an existing plugin
     func removePlugin(plugin: felt) {
     }
 
-    // Execute a library_call on a plugin to e.g. store some data in storage
-    func executeOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
+    func setDefaultPlugin(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
     }
 
-    // Check is a plugin is enabled on the account
     func isPlugin(plugin: felt) -> (success: felt) {
+    }
+
+    func readOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
+    }
+
+    func getDefaultPlugin() -> (plugin: felt) {
     }
 
     /////////////////////

@@ -1,11 +1,15 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.starknet.common.syscalls import get_tx_info
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from contracts.account.library import CallArray
+from starkware.starknet.common.syscalls import (
+    get_tx_info,
+    get_contract_address,
+    get_caller_address,
+)
 
 @storage_var
 func StarkSigner_public_key() -> (res: felt) {
@@ -28,7 +32,7 @@ func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 func setPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     public_key: felt
 ) {
-    assert_only_self()
+    assert_only_self();
 
     with_attr error_message("StarkSigner: public key can not be zero") {
         assert_not_zero(public_key);
