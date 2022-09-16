@@ -1,51 +1,58 @@
 %lang starknet
 
-from contracts.utils.structs import CallArray
+from contracts.account.library import CallArray
 
 @contract_interface
-namespace IPluginAccount:
-    
-    # Add a plugin
-    func add_plugin(plugin: felt):
-    end
+namespace IPluginAccount {
 
-    # Remove an existing plugin
-    func remove_plugin(plugin: felt):
-    end
+    /////////////////////
+    // Plugin
+    /////////////////////
 
-    # Execute a library_call on a plugin to e.g. store some data in storage 
-    func execute_on_plugin(
-            plugin: felt,
-            selector: felt,
-            calldata_len: felt,
-            calldata: felt*):
-    end
+    func addPlugin(plugin: felt) {
+    }
 
-    # Check is a plugin is enabled on the account
-    func is_plugin(plugin: felt) -> (success: felt):
-    end 
+    func removePlugin(plugin: felt) {
+    }
 
-    ####################
-    # IAccount
-    ####################
+    func setDefaultPlugin(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
+    }
 
-    func get_nonce() -> (res : felt):
-    end
+    func isPlugin(plugin: felt) -> (success: felt) {
+    }
 
-    func is_valid_signature(
-            hash: felt,
-            signature_len: felt,
-            signature: felt*
-        ) -> (is_valid: felt):
-    end
+    func readOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
+    }
+
+    func getDefaultPlugin() -> (plugin: felt) {
+    }
+
+    /////////////////////
+    // IAccount
+    /////////////////////
+
+    func supportsInterface(interfaceId: felt) -> (success: felt) {
+    }
+
+    func isValidSignature(hash: felt, signature_len: felt, signature: felt*) -> (isValid: felt) {
+    }
+
+    func __validate__(
+        call_array_len: felt,
+        call_array: CallArray*,
+        calldata_len: felt,
+        calldata: felt*
+    ) {
+    }
+
+    func __validate_declare__(class_hash: felt) {
+    }
 
     func __execute__(
-            call_array_len: felt,
-            call_array: CallArray*,
-            calldata_len: felt,
-            calldata: felt*,
-            nonce: felt
-        ) -> (response_len: felt, response: felt*):
-    end
-
-end
+        call_array_len: felt,
+        call_array: CallArray*,
+        calldata_len: felt,
+        calldata: felt*
+    ) -> (response_len: felt, response: felt*) {
+    }
+}
