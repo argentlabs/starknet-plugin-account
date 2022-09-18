@@ -75,24 +75,10 @@ func __validate__{
 ) {
     assert_initialized();
 
-    let (is_default_plugin, plugin_id, plugin_data_len, plugin_data) = use_plugin(
-        call_array_len, call_array, calldata_len, calldata
+    let (is_default_plugin, plugin_id) = use_plugin();
+    validate_with_plugin(
+        plugin_id, call_array_len, call_array, calldata_len, calldata
     );
-    if (is_default_plugin == TRUE) {
-        validate_with_plugin(
-            plugin_id, 0, plugin_data, call_array_len, call_array, calldata_len, calldata
-        );
-    } else {
-        validate_with_plugin(
-            plugin_id,
-            plugin_data_len,
-            plugin_data,
-            call_array_len - 1,
-            call_array + CallArray.SIZE,
-            calldata_len,
-            calldata,
-        );
-    }
     return ();
 }
 
@@ -107,27 +93,11 @@ func __execute__{
 
     assert_non_reentrant();
 
-    let (is_default_plugin, plugin_id, plugin_data_len, plugin_data) = use_plugin(
-        call_array_len, call_array, calldata_len, calldata
+    let (is_default_plugin, plugin_id) = use_plugin();
+    let (response_len, response) = execute_with_plugin(
+        plugin_id, call_array_len, call_array, calldata_len, calldata
     );
-    if (is_default_plugin == TRUE) {
-        let (response_len, response) = execute_with_plugin(
-            plugin_id, 0, plugin_data, call_array_len, call_array, calldata_len, calldata
-        );
-        return (retdata_size=response_len, retdata=response);
-    } else {
-        _current_plugin.write(plugin_id);
-        let (response_len, response) = execute_with_plugin(
-            plugin_id,
-            plugin_data_len,
-            plugin_data,
-            call_array_len - 1,
-            call_array + CallArray.SIZE,
-            calldata_len,
-            calldata,
-        );
-        return (retdata_size=response_len, retdata=response);
-    }
+    return (retdata_size=response_len, retdata=response);
 }
 
 @external
@@ -288,18 +258,18 @@ func isPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(p
 @view
 func readOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
-) {
-    let (is_plugin) = _plugins.read(plugin)
+) -> (retdata_len: felt, retdata: felt*) {
+    let (is_plugin) = _plugins.read(plugin);
     with_attr error_message("PluginAccount: unknown plugin") {
         assert_not_zero(is_plugin);
     }
-    let (retdata_size: felt, retdata: felt*) = library_call(
+    let (retdata_len: felt, retdata: felt*) = library_call(
         class_hash=plugin,
         function_selector=selector,
-        calldata_size=plugin_calldata_len,
-        calldata=plugin_calldata,
+        calldata_size=calldata_len,
+        calldata=calldata,
     );
-    return (retdata_size=retdata_size, retdata=retdata);
+    return (retdata_len=retdata_len, retdata=retdata);
 }
 
 @view
@@ -324,42 +294,33 @@ func getVersion() -> (version: felt) {
 // INTERNAL FUNCTIONS
 /////////////////////
 
-func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
-) -> (is_default_plugin: felt, plugin_id: felt, plugin_data_len: felt, plugin_data: felt*) {
+func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (is_default_plugin: felt, plugin_id: felt) {
     alloc_locals;
 
-    let (plugin_data: felt*) = alloc();
-    if (call_array[0].selector == USE_PLUGIN_SELECTOR) {
-        let plugin_id = calldata[call_array[0].data_offset];
+    let (tx_info) = get_tx_info();
+    if (tx_info.signature[0] == USE_PLUGIN_SELECTOR) {
+        let plugin_id = tx_info.signature[1];
         let (is_plugin) = _plugins.read(plugin_id);
         with_attr error_message("PluginAccount: unknown plugin") {
             assert_not_zero(is_plugin);
         }
-        memcpy(plugin_data, calldata + call_array[0].data_offset + 1, call_array[0].data_len - 1);
         return (
             is_default_plugin=FALSE,
             plugin_id=plugin_id,
-            plugin_data_len=call_array[0].data_len - 1,
-            plugin_data=plugin_data,
-        );
-    } else {
-        let (default_plugin) = _default_plugin.read();
-        return (
-            is_default_plugin=TRUE,
-            plugin_id=default_plugin,
-            plugin_data_len=0,
-            plugin_data=plugin_data,
         );
     }
+
+    let (default_plugin) = _default_plugin.read();
+    return (
+        is_default_plugin=TRUE,
+        plugin_id=default_plugin,
+    );
 }
 
 func validate_with_plugin{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
     plugin_id: felt,
-    plugin_data_len: felt,
-    plugin_data: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -367,8 +328,6 @@ func validate_with_plugin{
 ) {
     IPlugin.library_call_validate(
         class_hash=plugin_id,
-        plugin_data_len=plugin_data_len,
-        plugin_data=plugin_data,
         call_array_len=call_array_len,
         call_array=call_array,
         calldata_len=calldata_len,
@@ -381,8 +340,6 @@ func execute_with_plugin{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
     plugin_id: felt,
-    plugin_data_len: felt,
-    plugin_data: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,

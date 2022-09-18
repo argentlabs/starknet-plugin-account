@@ -72,8 +72,6 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
-    plugin_data_len: felt,
-    plugin_data: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -97,8 +95,8 @@ func is_valid_signature{
 ) -> (is_valid: felt) {
     let (public_key) = StarkSigner_public_key.read();
 
-    let sig_r = signature[0];
-    let sig_s = signature[1];
+    let sig_r = signature[2];
+    let sig_s = signature[3];
 
     verify_ecdsa_signature(
         message=hash,

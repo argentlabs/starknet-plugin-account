@@ -38,10 +38,8 @@ class StarkSigner():
         return sign(msg_hash=message_hash, priv_key=self.private_key)
 
     async def send_transaction(self, account, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
-
-        calls_with_selector = [(call[0], get_selector_from_name(call[1]), call[2]) for call in calls]
         call_array, calldata = from_call_to_call_array(calls)
-        
+
         raw_invocation = account.__execute__(call_array, calldata)
         state = raw_invocation.state
 
