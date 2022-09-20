@@ -57,7 +57,7 @@ class StarkSigner():
             additional_data=[nonce],
         )
 
-        signatures = list(self.sign(transaction_hash))
+        signatures = [0] + list(self.sign(transaction_hash))
 
         external_tx = InvokeFunction(
             contract_address=account.contract_address,

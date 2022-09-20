@@ -88,9 +88,8 @@ func __execute__{
 
     assert_non_reentrant();
 
-    let (plugin_id) = use_plugin();
-    let (response_len, response) = execute_with_plugin(
-        plugin_id, call_array_len, call_array, calldata_len, calldata
+    let (response_len, response) = execute(
+        call_array_len, call_array, calldata_len, calldata
     );
     return (retdata_size=response_len, retdata=response);
 }
@@ -121,11 +120,13 @@ func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         assert is_initialized = FALSE;
     }
 
-    set_default_plugin(plugin, plugin_calldata_len, plugin_calldata);
+    _plugins.write(0, plugin);
     _plugins.write(plugin, 1);
 
     let (self) = get_contract_address();
     account_created.emit(self);
+
+    initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
 
     return ();
 }
@@ -147,13 +148,16 @@ func __default__{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 @external
-func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) {
+func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
     assert_only_self();
 
     with_attr error_message("PluginAccount: plugin cannot be null") {
         assert_not_zero(plugin);
     }
+
+    initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
     _plugins.write(plugin, 1);
+
     return ();
 }
 
@@ -182,7 +186,17 @@ func setDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
     assert_only_self();
-    set_default_plugin(plugin, plugin_calldata_len, plugin_calldata);
+
+    with_attr error_message("PluginAccount: plugin cannot be null") {
+        assert_not_zero(plugin);
+    }
+
+    let (is_plugin) = _plugins.read(plugin);
+    with_attr error_message("PluginAccount: unknown plugin") {
+        assert_not_zero(is_plugin);
+    }
+
+    _plugins.write(0, plugin);
     return ();
 }
 
@@ -294,10 +308,16 @@ func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 
     let (tx_info) = get_tx_info();
     let plugin_id = tx_info.signature[0];
-    let (is_plugin) = _plugins.read(plugin_id);
-    with_attr error_message("PluginAccount: unknown plugin") {
-        assert_not_zero(is_plugin);
+    let (value) = _plugins.read(plugin_id);
+
+    if (plugin_id == 0) {
+        return (plugin_id=value);
     }
+
+    with_attr error_message("PluginAccount: unknown plugin") {
+        assert_not_zero(value);
+    }
+
     return (plugin_id=plugin_id);
 }
 
@@ -320,10 +340,9 @@ func validate_with_plugin{
     return ();
 }
 
-func execute_with_plugin{
+func execute{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    plugin_id: felt,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -341,28 +360,26 @@ func execute_with_plugin{
     //////////////////////////////////////////
 
     let (response: felt*) = alloc();
-    let (response_len) = execute_list(plugin_id, calls_len, calls, response);
+    let (response_len) = execute_list(calls_len, calls, response);
     transaction_executed.emit(
         hash=tx_info.transaction_hash, response_len=response_len, response=response
     );
     return (response_len, response);
 }
 
-func set_default_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func initialize_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
-    with_attr error_message("PluginAccount: plugin cannot be null") {
-        assert_not_zero(plugin);
+    if (plugin_calldata_len == 0) {
+        return ();
     }
-    // initialise the plugin
+
     library_call(
         class_hash=plugin,
         function_selector=INITIALIZE_SELECTOR,
         calldata_size=plugin_calldata_len,
         calldata=plugin_calldata,
     );
-
-    _plugins.write(0, plugin);
 
     return ();
 }
@@ -409,7 +426,7 @@ func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param response The array of felt to pupulate with the returned data
 // @return response_len The size of the returned data
 func execute_list{syscall_ptr: felt*}(
-    plugin_id: felt, calls_len: felt, calls: Call*, reponse: felt*
+    calls_len: felt, calls: Call*, reponse: felt*
 ) -> (response_len: felt) {
     alloc_locals;
 
@@ -431,7 +448,7 @@ func execute_list{syscall_ptr: felt*}(
     memcpy(reponse, res.retdata, res.retdata_size);
     // do the next calls recursively
     let (response_len) = execute_list(
-        plugin_id, calls_len - 1, calls + Call.SIZE, reponse + res.retdata_size
+        calls_len - 1, calls + Call.SIZE, reponse + res.retdata_size
     );
     return (response_len + res.retdata_size,);
 }
