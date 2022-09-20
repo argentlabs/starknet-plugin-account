@@ -27,7 +27,6 @@ const VERSION = '0.0.1';
 
 const IS_VALID_SIGNATURE_SELECTOR = 1138073982574099226972715907883430523600275391887289231447128254784345409857;
 const SUPPORTS_INTERFACE_SELECTOR = 1184015894760294494673613438913361435336722154500302038630992932234692784845;
-const USE_PLUGIN_SELECTOR = 1121675007639292412441492001821602921366030142137563176027248191276862353634;
 const INITIALIZE_SELECTOR = 215307247182100370520050591091822763712463273430149262739280891880522753123;
 const ERC165_ACCOUNT_INTERFACE_ID = 0xa66bd575;
 
@@ -56,10 +55,6 @@ func _current_plugin() -> (res: felt) {
 }
 
 @storage_var
-func _default_plugin() -> (res: felt) {
-}
-
-@storage_var
 func _plugins(plugin: felt) -> (res: felt) {
 }
 
@@ -75,7 +70,7 @@ func __validate__{
 ) {
     assert_initialized();
 
-    let (is_default_plugin, plugin_id) = use_plugin();
+    let (plugin_id) = use_plugin();
     validate_with_plugin(
         plugin_id, call_array_len, call_array, calldata_len, calldata
     );
@@ -93,7 +88,7 @@ func __execute__{
 
     assert_non_reentrant();
 
-    let (is_default_plugin, plugin_id) = use_plugin();
+    let (plugin_id) = use_plugin();
     let (response_len, response) = execute_with_plugin(
         plugin_id, call_array_len, call_array, calldata_len, calldata
     );
@@ -121,7 +116,7 @@ func __validate_declare__{
 func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
-    let (is_initialized) = _default_plugin.read();
+    let (is_initialized) = _plugins.read(0);
     with_attr error_message("PluginAccount: already initialized") {
         assert is_initialized = FALSE;
     }
@@ -173,7 +168,7 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     // cannot remove default plugin
     with_attr error_message("PluginAccount: cannot remove default plugin") {
-        let (default_plugin) = _default_plugin.read();
+        let (default_plugin) = _plugins.read(0);
         assert_not_equal(plugin, default_plugin);
     }
 
@@ -200,7 +195,7 @@ func isValidSignature{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
     alloc_locals;
-    let (default_plugin) = _default_plugin.read();
+    let (default_plugin) = _plugins.read(0);
 
     let (calldata: felt*) = alloc();
     assert calldata[0] = hash;
@@ -231,7 +226,7 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         return (TRUE,);
     }
 
-    let (default_plugin) = _default_plugin.read();
+    let (default_plugin) = _plugins.read(0);
 
     let (calldata: felt*) = alloc();
     assert calldata[0] = interfaceId;
@@ -276,7 +271,7 @@ func readOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 func getDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     plugin: felt
 ) {
-    let (res) = _default_plugin.read();
+    let (res) = _plugins.read(0);
     return (plugin=res);
 }
 
@@ -294,27 +289,16 @@ func getVersion() -> (version: felt) {
 // INTERNAL FUNCTIONS
 /////////////////////
 
-func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (is_default_plugin: felt, plugin_id: felt) {
+func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (plugin_id: felt) {
     alloc_locals;
 
     let (tx_info) = get_tx_info();
-    if (tx_info.signature[0] == USE_PLUGIN_SELECTOR) {
-        let plugin_id = tx_info.signature[1];
-        let (is_plugin) = _plugins.read(plugin_id);
-        with_attr error_message("PluginAccount: unknown plugin") {
-            assert_not_zero(is_plugin);
-        }
-        return (
-            is_default_plugin=FALSE,
-            plugin_id=plugin_id,
-        );
+    let plugin_id = tx_info.signature[0];
+    let (is_plugin) = _plugins.read(plugin_id);
+    with_attr error_message("PluginAccount: unknown plugin") {
+        assert_not_zero(is_plugin);
     }
-
-    let (default_plugin) = _default_plugin.read();
-    return (
-        is_default_plugin=TRUE,
-        plugin_id=default_plugin,
-    );
+    return (plugin_id=plugin_id);
 }
 
 func validate_with_plugin{
@@ -378,7 +362,7 @@ func set_default_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         calldata=plugin_calldata,
     );
 
-    _default_plugin.write(plugin);
+    _plugins.write(0, plugin);
 
     return ();
 }
@@ -388,7 +372,7 @@ func get_current_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 ) {
     let (current_plugin) = _current_plugin.read();
     if (current_plugin == 0) {
-        let (default_plugin) = _default_plugin.read();
+        let (default_plugin) = _plugins.read(0);
         return (default_plugin,);
     }
     return (current_plugin,);
@@ -412,7 +396,7 @@ func assert_non_reentrant{syscall_ptr: felt*}() -> () {
 }
 
 func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
-    let (default_plugin) = _default_plugin.read();
+    let (default_plugin) = _plugins.read(0);
     with_attr error_message("PluginAccount: account not initialized") {
         assert_not_zero(default_plugin);
     }
