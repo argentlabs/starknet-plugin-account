@@ -9,13 +9,13 @@ namespace IPluginAccount {
     // Plugin
     /////////////////////
 
-    func addPlugin(plugin: felt) {
+    func addPlugin(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
     }
 
     func removePlugin(plugin: felt) {
     }
 
-    func setDefaultPlugin(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
+    func setDefaultPlugin(plugin: felt) {
     }
 
     func isPlugin(plugin: felt) -> (success: felt) {

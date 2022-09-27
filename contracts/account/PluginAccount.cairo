@@ -27,7 +27,6 @@ const VERSION = '0.0.1';
 
 const IS_VALID_SIGNATURE_SELECTOR = 1138073982574099226972715907883430523600275391887289231447128254784345409857;
 const SUPPORTS_INTERFACE_SELECTOR = 1184015894760294494673613438913361435336722154500302038630992932234692784845;
-const USE_PLUGIN_SELECTOR = 1121675007639292412441492001821602921366030142137563176027248191276862353634;
 const INITIALIZE_SELECTOR = 215307247182100370520050591091822763712463273430149262739280891880522753123;
 const ERC165_ACCOUNT_INTERFACE_ID = 0xa66bd575;
 
@@ -56,10 +55,6 @@ func _current_plugin() -> (res: felt) {
 }
 
 @storage_var
-func _default_plugin() -> (res: felt) {
-}
-
-@storage_var
 func _plugins(plugin: felt) -> (res: felt) {
 }
 
@@ -75,24 +70,10 @@ func __validate__{
 ) {
     assert_initialized();
 
-    let (is_default_plugin, plugin_id, plugin_data_len, plugin_data) = use_plugin(
-        call_array_len, call_array, calldata_len, calldata
+    let (plugin_id) = use_plugin();
+    validate_with_plugin(
+        plugin_id, call_array_len, call_array, calldata_len, calldata
     );
-    if (is_default_plugin == TRUE) {
-        validate_with_plugin(
-            plugin_id, 0, plugin_data, call_array_len, call_array, calldata_len, calldata
-        );
-    } else {
-        validate_with_plugin(
-            plugin_id,
-            plugin_data_len,
-            plugin_data,
-            call_array_len - 1,
-            call_array + CallArray.SIZE,
-            calldata_len,
-            calldata,
-        );
-    }
     return ();
 }
 
@@ -107,27 +88,10 @@ func __execute__{
 
     assert_non_reentrant();
 
-    let (is_default_plugin, plugin_id, plugin_data_len, plugin_data) = use_plugin(
+    let (response_len, response) = execute(
         call_array_len, call_array, calldata_len, calldata
     );
-    if (is_default_plugin == TRUE) {
-        let (response_len, response) = execute_with_plugin(
-            plugin_id, 0, plugin_data, call_array_len, call_array, calldata_len, calldata
-        );
-        return (retdata_size=response_len, retdata=response);
-    } else {
-        _current_plugin.write(plugin_id);
-        let (response_len, response) = execute_with_plugin(
-            plugin_id,
-            plugin_data_len,
-            plugin_data,
-            call_array_len - 1,
-            call_array + CallArray.SIZE,
-            calldata_len,
-            calldata,
-        );
-        return (retdata_size=response_len, retdata=response);
-    }
+    return (retdata_size=response_len, retdata=response);
 }
 
 @external
@@ -151,16 +115,18 @@ func __validate_declare__{
 func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
-    let (is_initialized) = _default_plugin.read();
+    let (is_initialized) = _plugins.read(0);
     with_attr error_message("PluginAccount: already initialized") {
         assert is_initialized = FALSE;
     }
 
-    set_default_plugin(plugin, plugin_calldata_len, plugin_calldata);
+    _plugins.write(0, plugin);
     _plugins.write(plugin, 1);
 
     let (self) = get_contract_address();
     account_created.emit(self);
+
+    initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
 
     return ();
 }
@@ -182,13 +148,16 @@ func __default__{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 @external
-func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) {
+func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
     assert_only_self();
 
     with_attr error_message("PluginAccount: plugin cannot be null") {
         assert_not_zero(plugin);
     }
+
+    initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
     _plugins.write(plugin, 1);
+
     return ();
 }
 
@@ -203,7 +172,7 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     // cannot remove default plugin
     with_attr error_message("PluginAccount: cannot remove default plugin") {
-        let (default_plugin) = _default_plugin.read();
+        let (default_plugin) = _plugins.read(0);
         assert_not_equal(plugin, default_plugin);
     }
 
@@ -217,7 +186,17 @@ func setDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
     assert_only_self();
-    set_default_plugin(plugin, plugin_calldata_len, plugin_calldata);
+
+    with_attr error_message("PluginAccount: plugin cannot be null") {
+        assert_not_zero(plugin);
+    }
+
+    let (is_plugin) = _plugins.read(plugin);
+    with_attr error_message("PluginAccount: unknown plugin") {
+        assert_not_zero(is_plugin);
+    }
+
+    _plugins.write(0, plugin);
     return ();
 }
 
@@ -230,7 +209,7 @@ func isValidSignature{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
     alloc_locals;
-    let (default_plugin) = _default_plugin.read();
+    let (default_plugin) = _plugins.read(0);
 
     let (calldata: felt*) = alloc();
     assert calldata[0] = hash;
@@ -261,7 +240,7 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         return (TRUE,);
     }
 
-    let (default_plugin) = _default_plugin.read();
+    let (default_plugin) = _plugins.read(0);
 
     let (calldata: felt*) = alloc();
     assert calldata[0] = interfaceId;
@@ -288,25 +267,25 @@ func isPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(p
 @view
 func readOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
-) {
-    let (is_plugin) = _plugins.read(plugin)
+) -> (retdata_len: felt, retdata: felt*) {
+    let (is_plugin) = _plugins.read(plugin);
     with_attr error_message("PluginAccount: unknown plugin") {
         assert_not_zero(is_plugin);
     }
-    let (retdata_size: felt, retdata: felt*) = library_call(
+    let (retdata_len: felt, retdata: felt*) = library_call(
         class_hash=plugin,
         function_selector=selector,
-        calldata_size=plugin_calldata_len,
-        calldata=plugin_calldata,
+        calldata_size=calldata_len,
+        calldata=calldata,
     );
-    return (retdata_size=retdata_size, retdata=retdata);
+    return (retdata_len=retdata_len, retdata=retdata);
 }
 
 @view
 func getDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     plugin: felt
 ) {
-    let (res) = _default_plugin.read();
+    let (res) = _plugins.read(0);
     return (plugin=res);
 }
 
@@ -324,42 +303,28 @@ func getVersion() -> (version: felt) {
 // INTERNAL FUNCTIONS
 /////////////////////
 
-func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
-) -> (is_default_plugin: felt, plugin_id: felt, plugin_data_len: felt, plugin_data: felt*) {
+func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (plugin_id: felt) {
     alloc_locals;
 
-    let (plugin_data: felt*) = alloc();
-    if (call_array[0].selector == USE_PLUGIN_SELECTOR) {
-        let plugin_id = calldata[call_array[0].data_offset];
-        let (is_plugin) = _plugins.read(plugin_id);
-        with_attr error_message("PluginAccount: unknown plugin") {
-            assert_not_zero(is_plugin);
-        }
-        memcpy(plugin_data, calldata + call_array[0].data_offset + 1, call_array[0].data_len - 1);
-        return (
-            is_default_plugin=FALSE,
-            plugin_id=plugin_id,
-            plugin_data_len=call_array[0].data_len - 1,
-            plugin_data=plugin_data,
-        );
-    } else {
-        let (default_plugin) = _default_plugin.read();
-        return (
-            is_default_plugin=TRUE,
-            plugin_id=default_plugin,
-            plugin_data_len=0,
-            plugin_data=plugin_data,
-        );
+    let (tx_info) = get_tx_info();
+    let plugin_id = tx_info.signature[0];
+    let (value) = _plugins.read(plugin_id);
+
+    if (plugin_id == 0) {
+        return (plugin_id=value);
     }
+
+    with_attr error_message("PluginAccount: unknown plugin") {
+        assert_not_zero(value);
+    }
+
+    return (plugin_id=plugin_id);
 }
 
 func validate_with_plugin{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
     plugin_id: felt,
-    plugin_data_len: felt,
-    plugin_data: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -367,8 +332,6 @@ func validate_with_plugin{
 ) {
     IPlugin.library_call_validate(
         class_hash=plugin_id,
-        plugin_data_len=plugin_data_len,
-        plugin_data=plugin_data,
         call_array_len=call_array_len,
         call_array=call_array,
         calldata_len=calldata_len,
@@ -377,12 +340,9 @@ func validate_with_plugin{
     return ();
 }
 
-func execute_with_plugin{
+func execute{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    plugin_id: felt,
-    plugin_data_len: felt,
-    plugin_data: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -400,28 +360,26 @@ func execute_with_plugin{
     //////////////////////////////////////////
 
     let (response: felt*) = alloc();
-    let (response_len) = execute_list(plugin_id, calls_len, calls, response);
+    let (response_len) = execute_list(calls_len, calls, response);
     transaction_executed.emit(
         hash=tx_info.transaction_hash, response_len=response_len, response=response
     );
     return (response_len, response);
 }
 
-func set_default_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func initialize_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
-    with_attr error_message("PluginAccount: plugin cannot be null") {
-        assert_not_zero(plugin);
+    if (plugin_calldata_len == 0) {
+        return ();
     }
-    // initialise the plugin
+
     library_call(
         class_hash=plugin,
         function_selector=INITIALIZE_SELECTOR,
         calldata_size=plugin_calldata_len,
         calldata=plugin_calldata,
     );
-
-    _default_plugin.write(plugin);
 
     return ();
 }
@@ -431,7 +389,7 @@ func get_current_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 ) {
     let (current_plugin) = _current_plugin.read();
     if (current_plugin == 0) {
-        let (default_plugin) = _default_plugin.read();
+        let (default_plugin) = _plugins.read(0);
         return (default_plugin,);
     }
     return (current_plugin,);
@@ -455,7 +413,7 @@ func assert_non_reentrant{syscall_ptr: felt*}() -> () {
 }
 
 func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
-    let (default_plugin) = _default_plugin.read();
+    let (default_plugin) = _plugins.read(0);
     with_attr error_message("PluginAccount: account not initialized") {
         assert_not_zero(default_plugin);
     }
@@ -468,7 +426,7 @@ func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param response The array of felt to pupulate with the returned data
 // @return response_len The size of the returned data
 func execute_list{syscall_ptr: felt*}(
-    plugin_id: felt, calls_len: felt, calls: Call*, reponse: felt*
+    calls_len: felt, calls: Call*, reponse: felt*
 ) -> (response_len: felt) {
     alloc_locals;
 
@@ -490,7 +448,7 @@ func execute_list{syscall_ptr: felt*}(
     memcpy(reponse, res.retdata, res.retdata_size);
     // do the next calls recursively
     let (response_len) = execute_list(
-        plugin_id, calls_len - 1, calls + Call.SIZE, reponse + res.retdata_size
+        calls_len - 1, calls + Call.SIZE, reponse + res.retdata_size
     );
     return (response_len + res.retdata_size,);
 }
