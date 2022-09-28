@@ -28,7 +28,7 @@ const VERSION = '0.0.1';
 const IS_VALID_SIGNATURE_SELECTOR = 1138073982574099226972715907883430523600275391887289231447128254784345409857;
 const SUPPORTS_INTERFACE_SELECTOR = 1184015894760294494673613438913361435336722154500302038630992932234692784845;
 const INITIALIZE_SELECTOR = 215307247182100370520050591091822763712463273430149262739280891880522753123;
-const ERC165_ACCOUNT_INTERFACE_ID = 0xa66bd575;
+const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
 
 /////////////////////
 // EVENTS
@@ -74,6 +74,29 @@ func __validate__{
     validate_with_plugin(
         plugin_id, call_array_len, call_array, calldata_len, calldata
     );
+    return ();
+}
+
+@external
+func __validate_deploy__{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    ecdsa_ptr: SignatureBuiltin*,
+    range_check_ptr
+} (
+    class_hash: felt,
+    ctr_args_len: felt,
+    ctr_args: felt*,
+    salt: felt
+) {
+    alloc_locals;
+    // get the tx info
+    let (tx_info) = get_tx_info();
+    // validate the signer signature only
+    let (is_valid) = isValidSignature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
+    with_attr error_message("PluginAccount: invalid deploy") {
+        assert_not_zero(is_valid);
+    }
     return ();
 }
 
