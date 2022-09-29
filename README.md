@@ -99,9 +99,9 @@ For every transaction the caller can instruct the account to validate the multi-
 
 We note that the plugin must be called with a `library_call` to comply to the constraints of the `__validate__` method, which prevents accessing the storage of other contracts. I.e. the logic of the plugin is executed in the context of the account and the state of the plugin, if any, must be stored in the account.
 
-To instruct the account to use a specific plugin we leverage the transaction signature data. By convention, the first item in the signature data specifies either `0` (the default plugin) or the class hash of the plugin which should be used for validation. Any additional context necessary to validate the transaction, such as the signature itself, should be appended to the signature data.
+To instruct the account to use a specific plugin we leverage the transaction signature data. By convention, the first item in the signature data specifies the class hash of the plugin which should be used for validation. If no valid plugin is specified the default plugin is used. Any additional context necessary to validate the transaction, such as the signature itself, should be appended to the signature data.
 
-So to validate a call using the default plugin, the signature data should look like: `[0, ...]` and to validate it against a specific plugin, the signature data should look like `[pluginClassHash, ...]`
+So to validate a call using a specific plugin, the signature data should look like `[pluginClassHash, ...]`
 
 Similarly, the `isValidSignature` will validate a signature using the provided plugin in the passed signature data.
 

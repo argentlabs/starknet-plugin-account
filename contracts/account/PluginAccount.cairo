@@ -104,7 +104,7 @@ func __validate_deploy__{
 @raw_output
 func __execute__{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
-}(
+} (
     call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
 ) -> (retdata_size: felt, retdata: felt*) {
     alloc_locals;
@@ -331,17 +331,14 @@ func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 
     let (tx_info) = get_tx_info();
     let plugin_id = tx_info.signature[0];
-    let (value) = _plugins.read(plugin_id);
+    let (is_plugin) = _plugins.read(plugin_id);
 
-    if (plugin_id == 0) {
-        return (plugin_id=value);
+    if (is_plugin == TRUE) {
+        return (plugin_id=plugin_id);
+    } else {
+        let (default_plugin) = _plugins.read(0);
+        return (plugin_id=default_plugin);
     }
-
-    with_attr error_message("PluginAccount: unknown plugin") {
-        assert_not_zero(value);
-    }
-
-    return (plugin_id=plugin_id);
 }
 
 func validate_with_plugin{
