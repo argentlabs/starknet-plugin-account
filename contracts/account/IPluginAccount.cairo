@@ -48,6 +48,11 @@ namespace IPluginAccount {
     func __validate_declare__(class_hash: felt) {
     }
 
+    func __validate_deploy__(
+        class_hash: felt, ctr_args_len: felt, ctr_args: felt*, salt: felt
+    ) {
+    }
+
     func __execute__(
         call_array_len: felt,
         call_array: CallArray*,
