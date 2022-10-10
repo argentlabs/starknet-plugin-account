@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
-from utils import str_to_felt, cached_contract, compile, StarkSigner
+from utils.utils import str_to_felt, cached_contract, compile, StarkSigner
 
 signer = StarkSigner(1234)
 new_signer = StarkSigner(5678)
