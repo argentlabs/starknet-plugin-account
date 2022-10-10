@@ -95,8 +95,8 @@ func is_valid_signature{
 ) -> (is_valid: felt) {
     let (public_key) = StarkSigner_public_key.read();
 
-    let sig_r = signature[1];
-    let sig_s = signature[2];
+    let sig_r = signature[0];
+    let sig_s = signature[1];
 
     verify_ecdsa_signature(
         message=hash,
