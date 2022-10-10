@@ -79,7 +79,12 @@ func validate{
 ) {
     alloc_locals;
     let (tx_info) = get_tx_info();
-    is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
+    if (tx_info.signature_len == 2) {
+        is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
+    // we take the assumption then that sig_len == 3 and sig[0] == plugin_id
+    } else {
+        is_valid_signature(tx_info.transaction_hash, tx_info.signature_len - 1, tx_info.signature + 1);
+    }
     return ();
 }
 

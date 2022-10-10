@@ -60,7 +60,7 @@ class StarkSigner():
     def sign(self, message_hash: int) -> Tuple[int, int]:
         return sign(msg_hash=message_hash, priv_key=self.private_key)
 
-    async def send_transaction(self, account, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
+    async def send_transaction(self, account, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0, plugin_id: Optional[int] = None) -> TransactionExecutionInfo :
         call_array, calldata = from_call_to_call_array(calls)
 
         raw_invocation = account.__execute__(call_array, calldata)
@@ -80,8 +80,10 @@ class StarkSigner():
             additional_data=[nonce],
         )
 
-        # signatures = [0] + list(self.sign(transaction_hash))
-        signatures = list(self.sign(transaction_hash))
+        if plugin_id:
+            signatures = [plugin_id] + list(self.sign(transaction_hash))
+        else:
+            signatures = list(self.sign(transaction_hash))
 
         external_tx = InvokeFunction(
             contract_address=account.contract_address,
