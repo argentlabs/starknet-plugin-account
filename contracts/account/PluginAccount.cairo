@@ -25,7 +25,7 @@ from contracts.account.library import CallArray, Call
 const NAME = 'PluginAccount';
 const VERSION = '0.0.1';
 
-const IS_VALID_SIGNATURE_SELECTOR = 1138073982574099226972715907883430523600275391887289231447128254784345409857;
+const IS_VALID_SIGNATURE_SELECTOR = 939740983698321109974372403944035053902509983902899284679678367046923648926;
 const SUPPORTS_INTERFACE_SELECTOR = 1184015894760294494673613438913361435336722154500302038630992932234692784845;
 const INITIALIZE_SELECTOR = 215307247182100370520050591091822763712463273430149262739280891880522753123;
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
@@ -220,6 +220,22 @@ func setDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
 
     _plugins.write(0, plugin);
+    return ();
+}
+
+@external
+func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
+) {
+    // only called via execute
+    assert_only_self();
+    // only valid plugin
+    let (is_plugin) = _plugins.read(plugin);
+    assert_not_zero(is_plugin);
+
+    library_call(
+        class_hash=plugin, function_selector=selector, calldata_size=calldata_len, calldata=calldata
+    );
     return ();
 }
 
