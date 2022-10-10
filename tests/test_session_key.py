@@ -7,7 +7,7 @@ from starkware.starknet.business_logic.state.state import BlockInfo
 from starkware.cairo.common.hash_state import compute_hash_on_elements
 from starkware.starknet.compiler.compile import get_selector_from_name
 from utils.merkle_utils import generate_merkle_proof, generate_merkle_root, get_leaves
-from utils import assert_revert, str_to_felt, compile, cached_contract, assert_event_emitted, StarkSigner, PluginSigner
+from utils.utils import assert_revert, str_to_felt, compile, cached_contract, assert_event_emitted, StarkSigner, PluginSigner
 
 # H('StarkNetDomain(chainId:felt)')
 STARKNET_DOMAIN_TYPE_HASH = 0x13cda234a04d66db62c06b8e3ad5f91bd0c67286c2c7519a826cf49da6ba478
