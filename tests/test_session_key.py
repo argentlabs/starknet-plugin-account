@@ -162,7 +162,7 @@ async def test_call_dapp_with_session_key(account_factory, get_starknet):
             [
                 (dapp1.contract_address, 'set_balance_times3', [47])
             ]),
-        reverted_with="Not allowed by policy"
+        reverted_with="SessionKey: not allowed by policy"
     )
 
     # revoke session key
@@ -181,7 +181,7 @@ async def test_call_dapp_with_session_key(account_factory, get_starknet):
             [
                 (dapp1.contract_address, 'set_balance', [47])
             ]),
-        reverted_with="session key revoked"
+        reverted_with="SessionKey: session key revoked"
     )
 
 def get_session_token(session_key, session_expires, root, chain_id, account):
