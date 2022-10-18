@@ -15,16 +15,15 @@ namespace IPluginAccount {
     func removePlugin(plugin: felt) {
     }
 
-    func setDefaultPlugin(plugin: felt) {
-    }
-
     func isPlugin(plugin: felt) -> (success: felt) {
     }
 
     func readOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
     }
 
-    func getDefaultPlugin() -> (plugin: felt) {
+    func executeOnPlugin(
+        plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
+    ) -> (retdata_len: felt, retdata: felt*){
     }
 
     /////////////////////

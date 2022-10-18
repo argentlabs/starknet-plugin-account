@@ -102,7 +102,8 @@ func is_valid_signature{
         message=hash,
         public_key=public_key,
         signature_r=sig_r,
-        signature_s=sig_s);
+        signature_s=sig_s
+    );
 
     return (is_valid=TRUE);
 }

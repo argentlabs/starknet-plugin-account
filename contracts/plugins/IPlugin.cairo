@@ -8,6 +8,9 @@ namespace IPlugin {
     func initialize(data_len: felt, data: felt*) {
     }
 
+    func is_valid_signature(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
+    }
+
     func validate(
         call_array_len: felt,
         call_array: CallArray*,
