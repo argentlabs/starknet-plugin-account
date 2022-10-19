@@ -176,7 +176,7 @@ func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     let (is_plugin) = _plugins.read(plugin);
     with_attr error_message("PluginAccount: already a plugin") {
-        assert_not_zero(is_plugin);
+        assert is_plugin = 0;
     }
 
     _plugins.write(plugin, 1);
