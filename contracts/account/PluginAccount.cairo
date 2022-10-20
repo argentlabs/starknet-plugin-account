@@ -53,7 +53,7 @@ func _plugins(plugin: felt) -> (res: felt) {
 }
 
 @storage_var
-func _plugins_count() -> (res: felt) {
+func _initialized() -> (res: felt) {
 }
 
 /////////////////////
@@ -145,9 +145,9 @@ func __validate_declare__{
 func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
 ) {
-    let (plugins_count) = _plugins_count.read();
+    let (initialized) = _initialized.read();
     with_attr error_message("PluginAccount: already initialized") {
-        assert plugins_count = 0;
+        assert initialized = 0;
     }
 
     with_attr error_message("PluginAccount: plugin cannot be null") {
@@ -155,7 +155,7 @@ func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     }
 
     _plugins.write(plugin, 1);
-    _plugins_count.write(1);
+    _initialized.write(1);
 
     initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
 
@@ -180,8 +180,6 @@ func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     }
 
     _plugins.write(plugin, 1);
-    let (plugins_count) = _plugins_count.read();
-    _plugins_count.write(plugins_count + 1);
 
     initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
 
@@ -197,15 +195,14 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         assert_not_zero(is_plugin);
     }
 
-    let (plugins_count) = _plugins_count.read();
+    let (tx_info) = get_tx_info();
 
-    // cannot remove last plugin    
-    with_attr error_message("PluginAccount: cannot remove last plugin") {
-        assert_not_equal(plugins_count, 1);
+    let (signature_plugin) = get_plugin_from_signature(tx_info.signature_len, tx_info.signature);
+    with_attr error_message("PluginAccount: plugin can't remove itself") {
+        assert_not_equal(signature_plugin, plugin);
     }
 
     _plugins.write(plugin, 0);
-    _plugins_count.write(plugins_count - 1);
     return ();
 }
 
@@ -389,9 +386,9 @@ func assert_non_reentrant{syscall_ptr: felt*}() -> () {
 }
 
 func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
-    let (plugins_count) = _plugins_count.read();
+    let (initialized) = _initialized.read();
     with_attr error_message("PluginAccount: account not initialized") {
-        assert_not_zero(plugins_count);
+        assert_not_zero(initialized);
     }
     return ();
 }
