@@ -60,7 +60,7 @@ class StarkKeyPair:
         self.public_key = private_to_stark_key(private_key)
 
 
-class PluginSigner():
+class PluginSigner:
     def __init__(self, private_key):
         self.private_key = private_key
         self.public_key = private_to_stark_key(private_key)

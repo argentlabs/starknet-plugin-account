@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Optional, List, Tuple
 from starkware.crypto.signature.signature import sign
 from starkware.starknet.testing.contract import StarknetContract
@@ -10,15 +11,14 @@ from utils.utils import from_call_to_call_array, StarkKeyPair
 TRANSACTION_VERSION = 1
 
 
-class StarkPluginSigner:
-    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
-        self.stark_key = stark_key
+class PluginSigner:
+    def __init__(self, account: StarknetContract, plugin_address):
         self.account = account
         self.plugin_address = plugin_address
-        self.public_key = stark_key.public_key
 
+    @abstractmethod
     def sign(self, message_hash: int) -> List[int]:
-        return [self.plugin_address] + list(sign(msg_hash=message_hash, priv_key=self.stark_key.private_key))
+        ...
 
     async def send_transaction(self, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
         call_array, calldata = from_call_to_call_array(calls)
@@ -58,20 +58,39 @@ class StarkPluginSigner:
         execution_info = await state.execute_tx(tx=tx)
         return execution_info
 
-    async def execute_on_plugin(self, selector_name, arguments=None):
+    async def execute_on_plugin(self, selector_name, arguments=None, plugin=None):
         if arguments is None:
             arguments = []
 
+        if plugin is None:
+            plugin = self.plugin_address
+
         exec_arguments = [
-            self.plugin_address,
+            plugin,
             get_selector_from_name(selector_name),
             len(arguments),
             *arguments
         ]
         return await self.send_transaction([(self.account.contract_address, 'executeOnPlugin', exec_arguments)])
 
-    async def read_on_plugin(self, selector_name, arguments=None):
+    async def read_on_plugin(self, selector_name, arguments=None, plugin=None):
         if arguments is None:
             arguments = []
+
+        if plugin is None:
+            plugin = self.plugin_address
+
         selector = get_selector_from_name(selector_name)
-        return await self.account.readOnPlugin(self.plugin_address, selector, arguments).call()
+        return await self.account.readOnPlugin(plugin, selector, arguments).call()
+
+
+class StarkPluginSigner(PluginSigner):
+    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
+        super().__init__(account, plugin_address)
+        self.stark_key = stark_key
+        self.public_key = stark_key.public_key
+
+    def sign(self, message_hash: int) -> List[int]:
+        return [self.plugin_address] + list(sign(msg_hash=message_hash, priv_key=self.stark_key.private_key))
+
+

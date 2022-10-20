@@ -82,10 +82,10 @@ func validate{
         assert_nn(session_expires - now);
     }
 
-        let (session_hash) = compute_session_hash(
-            session_key, session_expires, root, tx_info.chain_id, tx_info.account_contract_address
-        );    
-        with_attr error_message("SessionKey: unauthorised session") {
+    let (session_hash) = compute_session_hash(
+        session_key, session_expires, root, tx_info.chain_id, tx_info.account_contract_address
+    );    
+    with_attr error_message("SessionKey: unauthorised session") {
         IAccount.isValidSignature(
             contract_address=tx_info.account_contract_address,
             hash=session_hash,
