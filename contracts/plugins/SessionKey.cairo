@@ -22,6 +22,8 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
     get_block_timestamp,
 )
+from contracts.account.library import Call, CallArray
+
 
 // H('StarkNetDomain(chainId:felt)')
 const STARKNET_DOMAIN_TYPE_HASH = 0x13cda234a04d66db62c06b8e3ad5f91bd0c67286c2c7519a826cf49da6ba478;
@@ -34,13 +36,6 @@ const POLICY_TYPE_HASH = 0x2f0026e78543f036f33e26a8f5891b88c58dc1e20cbbfaf0bb532
 namespace IAccount {
     func isValidSignature(hash: felt, sig_len: felt, sig: felt*) {
     }
-}
-
-struct CallArray {
-    to: felt,
-    selector: felt,
-    data_offset: felt,
-    data_len: felt,
 }
 
 @event
@@ -58,8 +53,10 @@ func validate{
     hash: felt, 
     sig_len: felt,
     sig: felt*,
-    calls_len: felt,
-    calls: Call*
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*,
 ) {
     alloc_locals;
 
@@ -108,6 +105,14 @@ func validate{
             signature_s=sig_s,
         );
     }
+
+    /////////////// TMP /////////////////////
+    // parse inputs to an array of 'Call' struct
+    let (calls: Call*) = alloc();
+    from_call_array_to_call(call_array_len, call_array, calldata, calls);
+    let calls_len = call_array_len;
+    //////////////////////////////////////////
+
     check_policy(calls_len, calls, root, proof_len, proofs_len, proofs);
 
     return ();
@@ -115,11 +120,17 @@ func validate{
 
 @external
 func execute(
-    calls_len: felt,
-    calls: Call*,
-) -> (calls_len: felt, calls: Call*, response_len: felt, response: felt*) {
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*,
+) -> (
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*, response_len: felt, response: felt*) {
     let (response: felt*) = alloc();
-    return (calls_len, calls, 0, response);
+    return (call_array_len, call_array, calldata_len, calldata, 0, response);
 }
 
 @external
@@ -139,7 +150,7 @@ func check_policy{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
     calls_len: felt,
-    calls: Call*
+    calls: Call*,
     root: felt,
     proof_len: felt,
     proofs_len: felt,
@@ -155,7 +166,7 @@ func check_policy{
     with hash_ptr {
         let (hash_state) = hash_init();
         let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=POLICY_TYPE_HASH);
-        let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=[call_array].to);
+        let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=[calls].to);
         let (hash_state) = hash_update_single(
             hash_state_ptr=hash_state, item=[calls].selector
         );
@@ -255,4 +266,27 @@ func calc_merkle_root{pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     let (res) = calc_merkle_root(node, proof_len - 1, proof + 1);
     return (res,);
+}
+
+func from_call_array_to_call{syscall_ptr: felt*}(
+    call_array_len: felt, call_array: CallArray*, calldata: felt*, calls: Call*
+) {
+    // if no more calls
+    if (call_array_len == 0) {
+        return ();
+    }
+
+    // parse the current call
+    assert [calls] = Call(
+        to=[call_array].to,
+        selector=[call_array].selector,
+        calldata_len=[call_array].data_len,
+        calldata=calldata + [call_array].data_offset
+        );
+
+    // parse the remaining calls recursively
+    from_call_array_to_call(
+        call_array_len - 1, call_array + CallArray.SIZE, calldata, calls + Call.SIZE
+    );
+    return ();
 }

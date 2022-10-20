@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.account.library import Call
+from contracts.account.library import Call, CallArray
 
 @contract_interface
 namespace IPlugin {
@@ -12,14 +12,25 @@ namespace IPlugin {
         hash: felt, 
         sig_len: felt,
         sig: felt*,
-        calls_len: felt,
-        calls: Call*
+        call_array_len: felt,
+        call_array: CallArray*,
+        calldata_len: felt,
+        calldata: felt*,
     ) {
     }
 
     func execute(
-        calls_len: felt,
-        calls: Call*,
-    ) -> (calls_len: felt, calls: Call*, response_len: felt, response: felt*) {
+        call_array_len: felt,
+        call_array: CallArray*,
+        calldata_len: felt,
+        calldata: felt*,
+    ) -> (
+        call_array_len: felt,
+        call_array: CallArray*,
+        calldata_len: felt,
+        calldata: felt*, 
+        response_len: felt, 
+        response: felt*
+    ) {
     }
 }

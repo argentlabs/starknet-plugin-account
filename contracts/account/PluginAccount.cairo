@@ -68,29 +68,29 @@ func __validate__{
 }(
     call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
 ) {
+    alloc_locals;
     assert_initialized();
 
     let (tx_info) = get_tx_info();
 
-    /////////////// TMP /////////////////////
-    // parse inputs to an array of 'Call' struct
-    let (calls: Call*) = alloc();
-    from_call_array_to_call(call_array_len, call_array, calldata, calls);
-    let calls_len = call_array_len;
-    //////////////////////////////////////////
-
-    inner_validate(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature, calls_len, calls);
+    inner_validate(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata);
 
     return ();
 }
 
-func inner_validate(
+func inner_validate{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+}(
     hash: felt, 
     sig_len: felt,
     sig: felt*,
-    calls_len: felt,
-    calls: Call*
+    call_array_len: felt, 
+    call_array: CallArray*, 
+    calldata_len: felt, 
+    calldata: felt*
 ) {
+    alloc_locals;
+
     if (sig_len == 0) {
         return ();
     }
@@ -99,15 +99,17 @@ func inner_validate(
     let plugin_sig_len = sig[1];
 
     IPlugin.library_call_validate(
-        class_hash=sig[0],
+        class_hash=plugin_id,
         hash=hash,
-        len=plugin_sig_len,
+        sig_len=plugin_sig_len,
         sig=sig + 2,
-        calls_len=calls_len,
-        calls=calls,
+        call_array_len=call_array_len,
+        call_array=call_array,
+        calldata_len=calldata_len,
+        calldata=calldata,
     );
 
-    return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, calls_len, calls);
+    return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, call_array_len, call_array, calldata_len, calldata);
 }
 
 @external
@@ -155,7 +157,7 @@ func __execute__{
 
     let (response: felt*) = alloc();
     let (response_len, response) = inner_execute(
-        tx_info.signature_len, tx_info.signature, calls_len, calls, 0, response,
+        tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata, 0, response,
     );
 
     transaction_executed.emit(
@@ -414,28 +416,41 @@ func inner_execute{
 }(
     sig_len: felt,
     sig: felt*,
-    calls_len: felt,
-    calls: Call*
+    call_array_len: felt, 
+    call_array: CallArray*, 
+    calldata_len: felt, 
+    calldata: felt*,
     response_len: felt,
     response: felt*,
 ) -> (response_len: felt, response: felt*) {
     alloc_locals;
 
     if (sig_len == 0) {
-        let (plugin_response_len, plugin_response) = execute_list(calls_len, calls);
-        memcpy(response, plugin_response, plugin_response_len);
+
+         /////////////// TMP /////////////////////
+        // parse inputs to an array of 'Call' struct
+        let (calls: Call*) = alloc();
+        from_call_array_to_call(call_array_len, call_array, calldata, calls);
+        let calls_len = call_array_len;
+        //////////////////////////////////////////
+        let (response: felt*) = alloc();
+        let (plugin_response_len) = execute_list(calls_len, calls, response);
+        memcpy(response, response, plugin_response_len);
         return (response_len + plugin_response_len, response);
     }
 
     let plugin_id = sig[0];
-    let (plugin_calls_len, plugin_calls, plugin_response_len, plugin_response) = IPlugin.library_call_execute(
-        class_hash=sig[0],
-        calls_len=calls_len,
-        calls=calls,
+    let plugin_sig_len = sig[1];
+    let (plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, plugin_response_len, plugin_response) = IPlugin.library_call_execute(
+        class_hash=plugin_id,
+        call_array_len=call_array_len,
+        call_array=call_array,
+        calldata_len=calldata_len,
+        calldata=calldata,
     );
 
     memcpy(response, plugin_response, plugin_response_len);
-    return inner_execute(sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, plugin_calls_len, plugin_calls, response_len + plugin_response_len, response);
+    return inner_execute(sig_len - plugin_response_len - plugin_sig_len - 2, sig + plugin_response_len + plugin_sig_len + 2, plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, response_len + plugin_response_len, response);
 }
 
 func initialize_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -497,8 +512,8 @@ func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param response The array of felt to pupulate with the returned data
 // @return response_len The size of the returned data
 func execute_list{syscall_ptr: felt*}(
-    calls_len: felt, calls: Call*
-) -> (response_len: felt, reponse: felt*) {
+    calls_len: felt, calls: Call*, response: felt*
+) -> (response_len: felt) {
     alloc_locals;
 
     // if no more calls
@@ -516,10 +531,10 @@ func execute_list{syscall_ptr: felt*}(
     );
 
     // copy the result in response
-    memcpy(reponse, res.retdata, res.retdata_size);
+    memcpy(response, res.retdata, res.retdata_size);
     // do the next calls recursively
     let (response_len) = execute_list(
-        calls_len - 1, calls + Call.SIZE, reponse + res.retdata_size
+        calls_len - 1, calls + Call.SIZE, response + res.retdata_size
     );
     return (response_len + res.retdata_size,);
 }
@@ -546,3 +561,4 @@ func from_call_array_to_call{syscall_ptr: felt*}(
     );
     return ();
 }
+
