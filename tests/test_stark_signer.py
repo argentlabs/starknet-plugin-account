@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
-from utils import str_to_felt, cached_contract, compile, StarkKeyPair
+from utils.utils import str_to_felt, cached_contract, compile, from_call_to_call_array, StarkKeyPair
 from stark_plugin_signer import StarkPluginSigner
 from starkware.starknet.public.abi import get_selector_from_name
 from typing import Optional, List, Tuple
@@ -79,10 +79,5 @@ async def test_change_public_key(contract_factory):
 
     execution_info = await stark_plugin_signer.read_on_plugin("getPublicKey")
     assert execution_info.result[0] == [new_key_pair.public_key]
-
-
-
-
-
 
 

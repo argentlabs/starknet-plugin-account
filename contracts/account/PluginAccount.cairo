@@ -210,6 +210,26 @@ func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 }
 
 
+@external
+func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
+) -> (retdata_len: felt, retdata: felt*) {
+
+    // only called via execute
+    assert_only_self();
+    // only valid plugin
+    let (is_plugin) = _plugins.read(plugin);
+    assert_not_zero(is_plugin);
+
+    let (retdata_len: felt, retdata: felt*) = library_call(
+        class_hash=plugin,
+        function_selector=selector,
+        calldata_size=calldata_len,
+        calldata=calldata,
+    );
+    return (retdata_len=retdata_len, retdata=retdata);
+}
+
 /////////////////////
 // VIEW FUNCTIONS
 /////////////////////
@@ -272,27 +292,6 @@ func readOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     );
     return (retdata_len=retdata_len, retdata=retdata);
 }
-
-@external
-func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
-) -> (retdata_len: felt, retdata: felt*) {
-
-    // only called via execute
-    assert_only_self();
-    // only valid plugin
-    let (is_plugin) = _plugins.read(plugin);
-    assert_not_zero(is_plugin);
-
-    let (retdata_len: felt, retdata: felt*) = library_call(
-        class_hash=plugin,
-        function_selector=selector,
-        calldata_size=calldata_len,
-        calldata=calldata,
-    );
-    return (retdata_len=retdata_len, retdata=retdata);
-}
-
 
 @view
 func getName() -> (name: felt) {

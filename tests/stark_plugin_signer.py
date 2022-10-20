@@ -6,7 +6,7 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import calcula
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction, Declare
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.compiler.compile import get_selector_from_name
-from utils import from_call_to_call_array, StarkKeyPair
+from utils.utils import from_call_to_call_array, StarkKeyPair
 TRANSACTION_VERSION = 1
 
 
