@@ -55,26 +55,27 @@ func SessionKey_revoked_keys(key: felt) -> (res: felt) {
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    call_array_len: felt,
-    call_array: CallArray*,
-    calldata_len: felt,
-    calldata: felt*,
+    hash: felt, 
+    sig_len: felt,
+    sig: felt*,
+    calls_len: felt,
+    calls: Call*
 ) {
     alloc_locals;
 
     // get the tx info
     let (tx_info) = get_tx_info();
 
-     // parse the plugin data
+    // parse the plugin data
     with_attr error_message("SessionKey: invalid plugin data") {
-        let sig_r = tx_info.signature[1];
-        let sig_s = tx_info.signature[2];
-        let session_key = [tx_info.signature + 3];
-        let session_expires = [tx_info.signature + 4];
-        let root = [tx_info.signature + 7];
-        let proof_len = [tx_info.signature + 8];
-        let proofs_len = [tx_info.signature + 9];
-        let proofs = tx_info.signature + 10;
+        let sig_r = sig[0];
+        let sig_s = sig[1];
+        let session_key = [sig + 2];
+        let session_expires = [sig + 3];
+        let root = [sig + 6];
+        let proof_len = [sig + 7];
+        let proofs_len = [sig + 8];
+        let proofs = sig + 9;
     }
 
     with_attr error_message("SessionKey: session expired") {
@@ -90,7 +91,7 @@ func validate{
             contract_address=tx_info.account_contract_address,
             hash=session_hash,
             sig_len=2,
-            sig=tx_info.signature + 5,
+            sig=sig + 4,
         );
     }
     // check if the session key is revoked
@@ -107,9 +108,18 @@ func validate{
             signature_s=sig_s,
         );
     }
-    check_policy(call_array_len, call_array, root, proof_len, proofs_len, proofs);
+    check_policy(calls_len, calls, root, proof_len, proofs_len, proofs);
 
     return ();
+}
+
+@external
+func execute(
+    calls_len: felt,
+    calls: Call*,
+) -> (calls_len: felt, calls: Call*, response_len: felt, response: felt*) {
+    let (response: felt*) = alloc();
+    return (calls_len, calls, 0, response);
 }
 
 @external
@@ -128,8 +138,8 @@ func revokeSessionKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func check_policy{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    call_array_len: felt,
-    call_array: CallArray*,
+    calls_len: felt,
+    calls: Call*
     root: felt,
     proof_len: felt,
     proofs_len: felt,
@@ -137,7 +147,7 @@ func check_policy{
 ) {
     alloc_locals;
 
-    if (call_array_len == 0) {
+    if (calls_len == 0) {
         return ();
     }
 
@@ -147,7 +157,7 @@ func check_policy{
         let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=POLICY_TYPE_HASH);
         let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=[call_array].to);
         let (hash_state) = hash_update_single(
-            hash_state_ptr=hash_state, item=[call_array].selector
+            hash_state_ptr=hash_state, item=[calls].selector
         );
         let (leaf) = hash_finalize(hash_state_ptr=hash_state);
         let pedersen_ptr = hash_ptr;
@@ -158,8 +168,8 @@ func check_policy{
         assert proof_valid = TRUE;
     }
     check_policy(
-        call_array_len - 1,
-        call_array + CallArray.SIZE,
+        calls_len - 1,
+        calls + Call.SIZE,
         root,
         proof_len,
         proofs_len - proof_len,

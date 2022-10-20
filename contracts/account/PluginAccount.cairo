@@ -70,11 +70,44 @@ func __validate__{
 ) {
     assert_initialized();
 
-    let (plugin_id) = use_plugin();
-    validate_with_plugin(
-        plugin_id, call_array_len, call_array, calldata_len, calldata
-    );
+    let (tx_info) = get_tx_info();
+
+    /////////////// TMP /////////////////////
+    // parse inputs to an array of 'Call' struct
+    let (calls: Call*) = alloc();
+    from_call_array_to_call(call_array_len, call_array, calldata, calls);
+    let calls_len = call_array_len;
+    //////////////////////////////////////////
+
+    inner_validate(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature, calls_len, calls);
+
     return ();
+}
+
+func inner_validate(
+    hash: felt, 
+    sig_len: felt,
+    sig: felt*,
+    calls_len: felt,
+    calls: Call*
+) {
+    if (sig_len == 0) {
+        return ();
+    }
+
+    let plugin_id = sig[0];
+    let plugin_sig_len = sig[1];
+
+    IPlugin.library_call_validate(
+        class_hash=sig[0],
+        hash=hash,
+        len=plugin_sig_len,
+        sig=sig + 2,
+        calls_len=calls_len,
+        calls=calls,
+    );
+
+    return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, calls_len, calls);
 }
 
 @external
@@ -111,9 +144,24 @@ func __execute__{
 
     assert_non_reentrant();
 
-    let (response_len, response) = execute(
-        call_array_len, call_array, calldata_len, calldata
+    let (tx_info) = get_tx_info();
+
+    /////////////// TMP /////////////////////
+    // parse inputs to an array of 'Call' struct
+    let (calls: Call*) = alloc();
+    from_call_array_to_call(call_array_len, call_array, calldata, calls);
+    let calls_len = call_array_len;
+    //////////////////////////////////////////
+
+    let (response: felt*) = alloc();
+    let (response_len, response) = inner_execute(
+        tx_info.signature_len, tx_info.signature, calls_len, calls, 0, response,
     );
+
+    transaction_executed.emit(
+        hash=tx_info.transaction_hash, response_len=response_len, response=response
+    );
+
     return (retdata_size=response_len, retdata=response);
 }
 
@@ -361,50 +409,33 @@ func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     }
 }
 
-func validate_with_plugin{
+func inner_execute{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    plugin_id: felt,
-    call_array_len: felt,
-    call_array: CallArray*,
-    calldata_len: felt,
-    calldata: felt*,
-) {
-    IPlugin.library_call_validate(
-        class_hash=plugin_id,
-        call_array_len=call_array_len,
-        call_array=call_array,
-        calldata_len=calldata_len,
-        calldata=calldata,
-    );
-    return ();
-}
-
-func execute{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
-}(
-    call_array_len: felt,
-    call_array: CallArray*,
-    calldata_len: felt,
-    calldata: felt*,
+    sig_len: felt,
+    sig: felt*,
+    calls_len: felt,
+    calls: Call*
+    response_len: felt,
+    response: felt*,
 ) -> (response_len: felt, response: felt*) {
     alloc_locals;
 
-    let (tx_info) = get_tx_info();
+    if (sig_len == 0) {
+        let (plugin_response_len, plugin_response) = execute_list(calls_len, calls);
+        memcpy(response, plugin_response, plugin_response_len);
+        return (response_len + plugin_response_len, response);
+    }
 
-    /////////////// TMP /////////////////////
-    // parse inputs to an array of 'Call' struct
-    let (calls: Call*) = alloc();
-    from_call_array_to_call(call_array_len, call_array, calldata, calls);
-    let calls_len = call_array_len;
-    //////////////////////////////////////////
-
-    let (response: felt*) = alloc();
-    let (response_len) = execute_list(calls_len, calls, response);
-    transaction_executed.emit(
-        hash=tx_info.transaction_hash, response_len=response_len, response=response
+    let plugin_id = sig[0];
+    let (plugin_calls_len, plugin_calls, plugin_response_len, plugin_response) = IPlugin.library_call_execute(
+        class_hash=sig[0],
+        calls_len=calls_len,
+        calls=calls,
     );
-    return (response_len, response);
+
+    memcpy(response, plugin_response, plugin_response_len);
+    return inner_execute(sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, plugin_calls_len, plugin_calls, response_len + plugin_response_len, response);
 }
 
 func initialize_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -466,8 +497,8 @@ func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param response The array of felt to pupulate with the returned data
 // @return response_len The size of the returned data
 func execute_list{syscall_ptr: felt*}(
-    calls_len: felt, calls: Call*, reponse: felt*
-) -> (response_len: felt) {
+    calls_len: felt, calls: Call*
+) -> (response_len: felt, reponse: felt*) {
     alloc_locals;
 
     // if no more calls

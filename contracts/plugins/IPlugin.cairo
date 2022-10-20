@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.account.library import CallArray
+from contracts.account.library import Call
 
 @contract_interface
 namespace IPlugin {
@@ -9,10 +9,17 @@ namespace IPlugin {
     }
 
     func validate(
-        call_array_len: felt,
-        call_array: CallArray*,
-        calldata_len: felt,
-        calldata: felt*,
+        hash: felt, 
+        sig_len: felt,
+        sig: felt*,
+        calls_len: felt,
+        calls: Call*
     ) {
+    }
+
+    func execute(
+        calls_len: felt,
+        calls: Call*,
+    ) -> (calls_len: felt, calls: Call*, response_len: felt, response: felt*) {
     }
 }
