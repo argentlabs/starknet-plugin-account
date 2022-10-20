@@ -1,13 +1,27 @@
 import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
-from utils.utils import str_to_felt, cached_contract, compile, from_call_to_call_array, StarkKeyPair
-from stark_plugin_signer import StarkPluginSigner
-from starkware.starknet.public.abi import get_selector_from_name
+from utils.utils import str_to_felt, cached_contract, compile
 from typing import Optional, List, Tuple
+from starkware.crypto.signature.signature import sign
+from starkware.starknet.testing.contract import StarknetContract
+from utils.plugin_signer import PluginSigner
+from utils.utils import StarkKeyPair
+
 
 key_pair = StarkKeyPair(1234)
 new_key_pair = StarkKeyPair(5678)
+
+
+class StarkPluginSigner(PluginSigner):
+    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
+        super().__init__(account, plugin_address)
+        self.stark_key = stark_key
+        self.public_key = stark_key.public_key
+
+    def sign(self, message_hash: int) -> List[int]:
+        return [self.plugin_address] + list(sign(msg_hash=message_hash, priv_key=self.stark_key.private_key))
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -35,21 +49,22 @@ async def contract_init(contract_classes):
     
     await account.initialize(sts_plugin_decl.class_hash, [key_pair.public_key]).execute()
 
-    stark_plugin_signer = StarkPluginSigner(
-        stark_key=key_pair,
-        account=account,
-        plugin_address=sts_plugin_decl.class_hash
-    )
-    return starknet.state, account, stark_plugin_signer, sts_plugin_decl.class_hash
+    return starknet.state, account, sts_plugin_decl.class_hash
 
 
 @pytest.fixture
 def contract_factory(contract_classes, contract_init):
     account_cls, sts_plugin_cls = contract_classes
-    state, account, stark_plugin_signer, sts_plugin_hash = contract_init
+    state, account, sts_plugin_hash = contract_init
     _state = state.copy()
 
     account = cached_contract(_state, account_cls, account)
+
+    stark_plugin_signer = StarkPluginSigner(
+        stark_key=key_pair,
+        account=account,
+        plugin_address=sts_plugin_hash
+    )
 
     return account, stark_plugin_signer, sts_plugin_hash
 
