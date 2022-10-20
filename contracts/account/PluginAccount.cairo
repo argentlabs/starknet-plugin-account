@@ -226,17 +226,21 @@ func setDefaultPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 @external
 func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
-) {
+) -> (retdata_len: felt, retdata: felt*) {
+
     // only called via execute
     assert_only_self();
     // only valid plugin
     let (is_plugin) = _plugins.read(plugin);
     assert_not_zero(is_plugin);
 
-    library_call(
-        class_hash=plugin, function_selector=selector, calldata_size=calldata_len, calldata=calldata
+    let (retdata_len: felt, retdata: felt*) = library_call(
+        class_hash=plugin,
+        function_selector=selector,
+        calldata_size=calldata_len,
+        calldata=calldata,
     );
-    return ();
+    return (retdata_len=retdata_len, retdata=retdata);
 }
 
 /////////////////////
