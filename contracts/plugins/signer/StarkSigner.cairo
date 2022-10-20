@@ -4,6 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.signature import verify_ecdsa_signature
+from starkware.cairo.common.alloc import alloc
 from contracts.account.library import CallArray
 from starkware.starknet.common.syscalls import (
     get_tx_info,
@@ -13,6 +14,21 @@ from starkware.starknet.common.syscalls import (
 
 @storage_var
 func StarkSigner_public_key() -> (res: felt) {
+}
+
+@external
+func execute(
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*,
+) -> (
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*, response_len: felt, response: felt*) {
+    let (response: felt*) = alloc();
+    return (call_array_len, call_array, calldata_len, calldata, 0, response);
 }
 
 @external
@@ -72,19 +88,16 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    hash: felt, 
+    sig_len: felt,
+    sig: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
     calldata: felt*,
 ) {
     alloc_locals;
-    let (tx_info) = get_tx_info();
-    if (tx_info.signature_len == 2) {
-        is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
-    // we take the assumption then that sig_len == 3 and sig[0] == plugin_id
-    } else {
-        is_valid_signature(tx_info.transaction_hash, tx_info.signature_len - 1, tx_info.signature + 1);
-    }
+    is_valid_signature(hash, sig_len, sig);
     return ();
 }
 

@@ -22,6 +22,8 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
     get_block_timestamp,
 )
+from contracts.account.library import Call, CallArray
+
 
 // H('StarkNetDomain(chainId:felt)')
 const STARKNET_DOMAIN_TYPE_HASH = 0x13cda234a04d66db62c06b8e3ad5f91bd0c67286c2c7519a826cf49da6ba478;
@@ -36,13 +38,6 @@ namespace IAccount {
     }
 }
 
-struct CallArray {
-    to: felt,
-    selector: felt,
-    data_offset: felt,
-    data_len: felt,
-}
-
 @event
 func session_key_revoked(session_key: felt) {
 }
@@ -55,6 +50,9 @@ func SessionKey_revoked_keys(key: felt) -> (res: felt) {
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
+    hash: felt, 
+    sig_len: felt,
+    sig: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -65,16 +63,16 @@ func validate{
     // get the tx info
     let (tx_info) = get_tx_info();
 
-     // parse the plugin data
+    // parse the plugin data
     with_attr error_message("SessionKey: invalid plugin data") {
-        let sig_r = tx_info.signature[1];
-        let sig_s = tx_info.signature[2];
-        let session_key = [tx_info.signature + 3];
-        let session_expires = [tx_info.signature + 4];
-        let root = [tx_info.signature + 7];
-        let proof_len = [tx_info.signature + 8];
-        let proofs_len = [tx_info.signature + 9];
-        let proofs = tx_info.signature + 10;
+        let sig_r = sig[0];
+        let sig_s = sig[1];
+        let session_key = [sig + 2];
+        let session_expires = [sig + 3];
+        let root = [sig + 6];
+        let proof_len = [sig + 7];
+        let proofs_len = [sig + 8];
+        let proofs = sig + 9;
     }
 
     with_attr error_message("SessionKey: session expired") {
@@ -90,7 +88,7 @@ func validate{
             contract_address=tx_info.account_contract_address,
             hash=session_hash,
             sig_len=2,
-            sig=tx_info.signature + 5,
+            sig=sig + 4,
         );
     }
     // check if the session key is revoked
@@ -107,9 +105,32 @@ func validate{
             signature_s=sig_s,
         );
     }
-    check_policy(call_array_len, call_array, root, proof_len, proofs_len, proofs);
+
+    /////////////// TMP /////////////////////
+    // parse inputs to an array of 'Call' struct
+    let (calls: Call*) = alloc();
+    from_call_array_to_call(call_array_len, call_array, calldata, calls);
+    let calls_len = call_array_len;
+    //////////////////////////////////////////
+
+    check_policy(calls_len, calls, root, proof_len, proofs_len, proofs);
 
     return ();
+}
+
+@external
+func execute(
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*,
+) -> (
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*, response_len: felt, response: felt*) {
+    let (response: felt*) = alloc();
+    return (call_array_len, call_array, calldata_len, calldata, 0, response);
 }
 
 @external
@@ -128,8 +149,8 @@ func revokeSessionKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func check_policy{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    call_array_len: felt,
-    call_array: CallArray*,
+    calls_len: felt,
+    calls: Call*,
     root: felt,
     proof_len: felt,
     proofs_len: felt,
@@ -137,7 +158,7 @@ func check_policy{
 ) {
     alloc_locals;
 
-    if (call_array_len == 0) {
+    if (calls_len == 0) {
         return ();
     }
 
@@ -145,9 +166,9 @@ func check_policy{
     with hash_ptr {
         let (hash_state) = hash_init();
         let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=POLICY_TYPE_HASH);
-        let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=[call_array].to);
+        let (hash_state) = hash_update_single(hash_state_ptr=hash_state, item=[calls].to);
         let (hash_state) = hash_update_single(
-            hash_state_ptr=hash_state, item=[call_array].selector
+            hash_state_ptr=hash_state, item=[calls].selector
         );
         let (leaf) = hash_finalize(hash_state_ptr=hash_state);
         let pedersen_ptr = hash_ptr;
@@ -158,8 +179,8 @@ func check_policy{
         assert proof_valid = TRUE;
     }
     check_policy(
-        call_array_len - 1,
-        call_array + CallArray.SIZE,
+        calls_len - 1,
+        calls + Call.SIZE,
         root,
         proof_len,
         proofs_len - proof_len,
@@ -245,4 +266,27 @@ func calc_merkle_root{pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     let (res) = calc_merkle_root(node, proof_len - 1, proof + 1);
     return (res,);
+}
+
+func from_call_array_to_call{syscall_ptr: felt*}(
+    call_array_len: felt, call_array: CallArray*, calldata: felt*, calls: Call*
+) {
+    // if no more calls
+    if (call_array_len == 0) {
+        return ();
+    }
+
+    // parse the current call
+    assert [calls] = Call(
+        to=[call_array].to,
+        selector=[call_array].selector,
+        calldata_len=[call_array].data_len,
+        calldata=calldata + [call_array].data_offset
+        );
+
+    // parse the remaining calls recursively
+    from_call_array_to_call(
+        call_array_len - 1, call_array + CallArray.SIZE, calldata, calls + Call.SIZE
+    );
+    return ();
 }

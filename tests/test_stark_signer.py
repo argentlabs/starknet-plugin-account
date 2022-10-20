@@ -60,8 +60,11 @@ async def test_initialise(contract_factory):
 @pytest.mark.asyncio
 async def test_change_public_key(contract_factory):
     account, account_as_plugin, sts_plugin_hash = contract_factory
-
-    execution_info = await signer.send_transaction(account, [(account.contract_address, 'setPublicKey', [new_signer.public_key])])
+    
+    execution_info = await signer.send_transaction(
+    account, 
+    plugin_id=sts_plugin_hash,
+    calls=[(account.contract_address, 'setPublicKey', [new_signer.public_key])])
 
     execution_info = await account_as_plugin.getPublicKey().call()
     assert execution_info.result == (new_signer.public_key,)
@@ -70,7 +73,10 @@ async def test_change_public_key(contract_factory):
 async def test_with_plugin_in_signature(contract_factory):
     account, account_as_plugin, sts_plugin_hash = contract_factory
 
-    execution_info = await signer.send_transaction(account, [(account.contract_address, 'setPublicKey', [new_signer.public_key])], plugin_id=0)
+    execution_info = await signer.send_transaction(
+        account,
+        plugin_id=sts_plugin_hash,
+        calls=[(account.contract_address, 'setPublicKey', [new_signer.public_key])])
 
     execution_info = await account_as_plugin.getPublicKey().call()
     assert execution_info.result == (new_signer.public_key,)

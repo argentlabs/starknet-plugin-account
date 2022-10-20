@@ -68,13 +68,48 @@ func __validate__{
 }(
     call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
 ) {
+    alloc_locals;
     assert_initialized();
 
-    let (plugin_id) = use_plugin();
-    validate_with_plugin(
-        plugin_id, call_array_len, call_array, calldata_len, calldata
-    );
+    let (tx_info) = get_tx_info();
+
+    inner_validate(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata);
+
     return ();
+}
+
+func inner_validate{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+}(
+    hash: felt, 
+    sig_len: felt,
+    sig: felt*,
+    call_array_len: felt, 
+    call_array: CallArray*, 
+    calldata_len: felt, 
+    calldata: felt*
+) {
+    alloc_locals;
+
+    if (sig_len == 0) {
+        return ();
+    }
+
+    let plugin_id = sig[0];
+    let plugin_sig_len = sig[1];
+
+    IPlugin.library_call_validate(
+        class_hash=plugin_id,
+        hash=hash,
+        sig_len=plugin_sig_len,
+        sig=sig + 2,
+        call_array_len=call_array_len,
+        call_array=call_array,
+        calldata_len=calldata_len,
+        calldata=calldata,
+    );
+
+    return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, call_array_len, call_array, calldata_len, calldata);
 }
 
 @external
@@ -111,9 +146,24 @@ func __execute__{
 
     assert_non_reentrant();
 
-    let (response_len, response) = execute(
-        call_array_len, call_array, calldata_len, calldata
+    let (tx_info) = get_tx_info();
+
+    /////////////// TMP /////////////////////
+    // parse inputs to an array of 'Call' struct
+    let (calls: Call*) = alloc();
+    from_call_array_to_call(call_array_len, call_array, calldata, calls);
+    let calls_len = call_array_len;
+    //////////////////////////////////////////
+
+    let (response: felt*) = alloc();
+    let (response_len, response) = inner_execute(
+        tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata, 0, response,
     );
+
+    transaction_executed.emit(
+        hash=tx_info.transaction_hash, response_len=response_len, response=response
+    );
+
     return (retdata_size=response_len, retdata=response);
 }
 
@@ -361,50 +411,46 @@ func use_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     }
 }
 
-func validate_with_plugin{
+func inner_execute{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
-    plugin_id: felt,
-    call_array_len: felt,
-    call_array: CallArray*,
-    calldata_len: felt,
+    sig_len: felt,
+    sig: felt*,
+    call_array_len: felt, 
+    call_array: CallArray*, 
+    calldata_len: felt, 
     calldata: felt*,
-) {
-    IPlugin.library_call_validate(
+    response_len: felt,
+    response: felt*,
+) -> (response_len: felt, response: felt*) {
+    alloc_locals;
+
+    if (sig_len == 0) {
+
+         /////////////// TMP /////////////////////
+        // parse inputs to an array of 'Call' struct
+        let (calls: Call*) = alloc();
+        from_call_array_to_call(call_array_len, call_array, calldata, calls);
+        let calls_len = call_array_len;
+        //////////////////////////////////////////
+        let (response: felt*) = alloc();
+        let (plugin_response_len) = execute_list(calls_len, calls, response);
+        memcpy(response, response, plugin_response_len);
+        return (response_len + plugin_response_len, response);
+    }
+
+    let plugin_id = sig[0];
+    let plugin_sig_len = sig[1];
+    let (plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, plugin_response_len, plugin_response) = IPlugin.library_call_execute(
         class_hash=plugin_id,
         call_array_len=call_array_len,
         call_array=call_array,
         calldata_len=calldata_len,
         calldata=calldata,
     );
-    return ();
-}
 
-func execute{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
-}(
-    call_array_len: felt,
-    call_array: CallArray*,
-    calldata_len: felt,
-    calldata: felt*,
-) -> (response_len: felt, response: felt*) {
-    alloc_locals;
-
-    let (tx_info) = get_tx_info();
-
-    /////////////// TMP /////////////////////
-    // parse inputs to an array of 'Call' struct
-    let (calls: Call*) = alloc();
-    from_call_array_to_call(call_array_len, call_array, calldata, calls);
-    let calls_len = call_array_len;
-    //////////////////////////////////////////
-
-    let (response: felt*) = alloc();
-    let (response_len) = execute_list(calls_len, calls, response);
-    transaction_executed.emit(
-        hash=tx_info.transaction_hash, response_len=response_len, response=response
-    );
-    return (response_len, response);
+    memcpy(response, plugin_response, plugin_response_len);
+    return inner_execute(sig_len - plugin_response_len - plugin_sig_len - 2, sig + plugin_response_len + plugin_sig_len + 2, plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, response_len + plugin_response_len, response);
 }
 
 func initialize_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -466,7 +512,7 @@ func assert_initialized{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param response The array of felt to pupulate with the returned data
 // @return response_len The size of the returned data
 func execute_list{syscall_ptr: felt*}(
-    calls_len: felt, calls: Call*, reponse: felt*
+    calls_len: felt, calls: Call*, response: felt*
 ) -> (response_len: felt) {
     alloc_locals;
 
@@ -485,10 +531,10 @@ func execute_list{syscall_ptr: felt*}(
     );
 
     // copy the result in response
-    memcpy(reponse, res.retdata, res.retdata_size);
+    memcpy(response, res.retdata, res.retdata_size);
     // do the next calls recursively
     let (response_len) = execute_list(
-        calls_len - 1, calls + Call.SIZE, reponse + res.retdata_size
+        calls_len - 1, calls + Call.SIZE, response + res.retdata_size
     );
     return (response_len + res.retdata_size,);
 }
@@ -515,3 +561,4 @@ func from_call_array_to_call{syscall_ptr: felt*}(
     );
     return ();
 }
+

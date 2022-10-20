@@ -81,7 +81,7 @@ class StarkSigner():
         )
 
         if plugin_id:
-            signatures = [plugin_id] + list(self.sign(transaction_hash))
+            signatures = [plugin_id, 2] + list(self.sign(transaction_hash))
         else:
             signatures = list(self.sign(transaction_hash))
 
