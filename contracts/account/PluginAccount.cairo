@@ -317,7 +317,7 @@ func get_plugin_from_signature{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let plugin = signature[0];
 
     let (is_plugin) = _plugins.read(plugin);
-    with_attr error_message("PluginAccount: unknown plugin") {
+    with_attr error_message("PluginAccount: unregistered plugin") {
         assert_not_zero(is_plugin);
     }
     return (plugin=plugin);
