@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from utils.utils import str_to_felt, cached_contract, compile
-from utils.utils import StarkKeyPair
+from utils.utils import StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
 from utils.plugin_signer import StarkPluginSigner
 
 key_pair = StarkKeyPair(1234)
@@ -82,3 +82,9 @@ async def test_change_public_key(contract_factory):
     assert execution_info.result[0] == [new_key_pair.public_key]
 
 
+@pytest.mark.asyncio
+async def test_supportsInterface(contract_factory):
+    account, stark_plugin_signer, sts_plugin_hash = contract_factory
+    assert (await stark_plugin_signer.read_on_plugin("supportsInterface", [ERC165_INTERFACE_ID])).result[0] == [1]
+    assert (await stark_plugin_signer.read_on_plugin("supportsInterface", [ERC165_ACCOUNT_INTERFACE_ID])).result[0] == [0]
+    assert (await stark_plugin_signer.read_on_plugin("supportsInterface", [ERC165_ACCOUNT_INTERFACE_ID])).result[0] == [0]

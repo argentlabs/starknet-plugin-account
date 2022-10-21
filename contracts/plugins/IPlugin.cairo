@@ -11,6 +11,9 @@ namespace IPlugin {
     func is_valid_signature(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
     }
 
+    func supportsInterface(interfaceId: felt) -> (success: felt) {
+    }
+
     func validate(
         call_array_len: felt,
         call_array: CallArray*,

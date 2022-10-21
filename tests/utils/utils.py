@@ -9,6 +9,9 @@ from starkware.starknet.business_logic.execution.objects import Event
 from typing import Optional, List, Tuple
 from starkware.crypto.signature.signature import private_to_stark_key, sign
 
+ERC165_INTERFACE_ID = 0x01ffc9a7
+ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f
+
 def str_to_felt(text: str) -> int:
     b_text = bytes(text, 'UTF-8')
     return int.from_bytes(b_text, "big")

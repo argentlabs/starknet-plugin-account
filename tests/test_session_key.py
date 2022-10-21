@@ -4,7 +4,7 @@ import logging
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils.utils import assert_revert, compile, cached_contract, assert_event_emitted, StarkKeyPair
+from utils.utils import assert_revert, compile, cached_contract, assert_event_emitted, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
 from utils.plugin_signer import StarkPluginSigner
 from utils.session_keys_utils import build_session, SessionPluginSigner
 
@@ -100,26 +100,6 @@ def account_factory(contract_classes, account_init):
 
 
 @pytest.mark.asyncio
-async def test_addPlugin(account_factory):
-    account, stark_plugin_signer, _, _, _, session_key_class = account_factory
-
-    assert (await account.isPlugin(session_key_class).call()).result.success == 0
-    await stark_plugin_signer.add_plugin(session_key_class)
-    assert (await account.isPlugin(session_key_class).call()).result.success == 1
-
-
-@pytest.mark.asyncio
-async def test_removePlugin(account_factory):
-    account, stark_plugin_signer, _, _, _, session_key_class = account_factory
-
-    assert (await account.isPlugin(session_key_class).call()).result.success == 0
-    await stark_plugin_signer.add_plugin(session_key_class)
-    assert (await account.isPlugin(session_key_class).call()).result.success == 1
-    await stark_plugin_signer.remove_plugin(session_key_class)
-    assert (await account.isPlugin(session_key_class).call()).result.success == 0
-
-
-@pytest.mark.asyncio
 async def test_call_dapp_with_session_key(account_factory, get_starknet):
     account, stark_plugin_signer, session_plugin_signer, dapp1, dapp2, session_key_class = account_factory
     starknet = get_starknet
@@ -190,3 +170,11 @@ async def test_call_dapp_with_session_key(account_factory, get_starknet):
         ),
         reverted_with="SessionKey: session key revoked"
     )
+
+@pytest.mark.asyncio
+async def test_supportsInterface(account_factory):
+    _, stark_plugin_signer, _, _, _, session_key_class = account_factory
+    await stark_plugin_signer.add_plugin(session_key_class)
+    assert (await stark_plugin_signer.read_on_plugin("supportsInterface", [ERC165_INTERFACE_ID], plugin=session_key_class)).result[0] == [1]
+    assert (await stark_plugin_signer.read_on_plugin("supportsInterface", [ERC165_ACCOUNT_INTERFACE_ID], plugin=session_key_class)).result[0] == [0]
+    assert (await stark_plugin_signer.read_on_plugin("supportsInterface", [ERC165_ACCOUNT_INTERFACE_ID], plugin=session_key_class)).result[0] == [0]

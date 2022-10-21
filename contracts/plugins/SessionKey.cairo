@@ -52,6 +52,17 @@ func SessionKey_revoked_keys(key: felt) -> (res: felt) {
 }
 
 @view
+func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    interfaceId: felt
+) -> (success: felt) {
+    // 165
+    if (interfaceId == 0x01ffc9a7) {
+        return (TRUE,);
+    }
+    return (FALSE,);
+}
+
+@view
 func is_valid_signature{
     syscall_ptr : felt*,
     pedersen_ptr : HashBuiltin*,
