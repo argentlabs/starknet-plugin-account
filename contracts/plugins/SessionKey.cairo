@@ -51,6 +51,19 @@ func session_key_revoked(session_key: felt) {
 func SessionKey_revoked_keys(key: felt) -> (res: felt) {
 }
 
+@view
+func is_valid_signature{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr,
+    ecdsa_ptr: SignatureBuiltin*
+}(
+    hash: felt,
+    signature_len: felt,
+    signature: felt*
+) -> (is_valid: felt) {
+    return (is_valid=FALSE); // This plugin can only validate call
+}
 @external
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
@@ -69,12 +82,15 @@ func validate{
     with_attr error_message("SessionKey: invalid plugin data") {
         let sig_r = tx_info.signature[1];
         let sig_s = tx_info.signature[2];
-        let session_key = [tx_info.signature + 3];
-        let session_expires = [tx_info.signature + 4];
-        let root = [tx_info.signature + 7];
-        let proof_len = [tx_info.signature + 8];
-        let proofs_len = [tx_info.signature + 9];
-        let proofs = tx_info.signature + 10;
+        let session_key = tx_info.signature[3];
+        let session_expires = tx_info.signature[4];
+        let root = tx_info.signature[5];
+        let proof_len = tx_info.signature[6];
+        let proofs_len = tx_info.signature[7];
+        let proofs = tx_info.signature + 8;
+        let session_token_offset = 8 + proofs_len;
+        let session_token_len = tx_info.signature[session_token_offset];
+        let session_token = tx_info.signature + session_token_offset + 1;
     }
 
     with_attr error_message("SessionKey: session expired") {
@@ -89,8 +105,8 @@ func validate{
         IAccount.isValidSignature(
             contract_address=tx_info.account_contract_address,
             hash=session_hash,
-            sig_len=2,
-            sig=tx_info.signature + 5,
+            sig_len=session_token_len,
+            sig=session_token,
         );
     }
     // check if the session key is revoked

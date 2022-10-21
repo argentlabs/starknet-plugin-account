@@ -40,13 +40,14 @@ class PluginSigner:
             additional_data=[nonce],
         )
 
-        signatures = self.sign(transaction_hash)
+
+        signature = self.sign(transaction_hash)
 
         external_tx = InvokeFunction(
             contract_address=self.account.contract_address,
             calldata=raw_invocation.calldata,
             entry_point_selector=None,
-            signature=signatures,
+            signature=signature,
             max_fee=max_fee,
             version=TRANSACTION_VERSION,
             nonce=nonce,
@@ -82,3 +83,21 @@ class PluginSigner:
 
         selector = get_selector_from_name(selector_name)
         return await self.account.readOnPlugin(plugin, selector, arguments).call()
+
+    async def add_plugin(self, plugin: int, plugin_arguments=None):
+        if plugin_arguments is None:
+            plugin_arguments = []
+        return await self.send_transaction([(self.account.contract_address, 'addPlugin', [plugin, len(plugin_arguments), *plugin_arguments])])
+
+    async def remove_plugin(self, plugin: int):
+        return await self.send_transaction([(self.account.contract_address, 'removePlugin', [plugin])])
+
+
+class StarkPluginSigner(PluginSigner):
+    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
+        super().__init__(account, plugin_address)
+        self.stark_key = stark_key
+        self.public_key = stark_key.public_key
+
+    def sign(self, message_hash: int) -> List[int]:
+        return [self.plugin_address] + list(self.stark_key.sign(message_hash))

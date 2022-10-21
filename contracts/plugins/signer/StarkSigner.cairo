@@ -49,13 +49,6 @@ func getPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     return (public_key=public_key);
 }
 
-@view
-func isValidSignature{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
-}(hash: felt, signature_len: felt, signature: felt*) -> (isValid: felt) {
-    let (isValid) = is_valid_signature(hash, signature_len, signature);
-    return (isValid=isValid);
-}
 
 @view
 func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -83,6 +76,7 @@ func validate{
     return ();
 }
 
+@view
 func is_valid_signature{
     syscall_ptr : felt*,
     pedersen_ptr : HashBuiltin*,

@@ -2,25 +2,11 @@ import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from utils.utils import str_to_felt, cached_contract, compile
-from typing import Optional, List, Tuple
-from starkware.crypto.signature.signature import sign
-from starkware.starknet.testing.contract import StarknetContract
-from utils.plugin_signer import PluginSigner
 from utils.utils import StarkKeyPair
-
+from utils.plugin_signer import StarkPluginSigner
 
 key_pair = StarkKeyPair(1234)
 new_key_pair = StarkKeyPair(5678)
-
-
-class StarkPluginSigner(PluginSigner):
-    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
-        super().__init__(account, plugin_address)
-        self.stark_key = stark_key
-        self.public_key = stark_key.public_key
-
-    def sign(self, message_hash: int) -> List[int]:
-        return [self.plugin_address] + list(sign(msg_hash=message_hash, priv_key=self.stark_key.private_key))
 
 
 @pytest.fixture(scope='module')
