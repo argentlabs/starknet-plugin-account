@@ -40,7 +40,6 @@ class PluginSigner:
             additional_data=[nonce],
         )
 
-
         signature = self.sign(transaction_hash)
 
         external_tx = InvokeFunction(

@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import logging
 from starkware.starknet.testing.starknet import Starknet
-from utils.utils import compile, cached_contract, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
+from utils.utils import compile, cached_contract, assert_event_emitted, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
 from utils.plugin_signer import StarkPluginSigner
 from utils.session_keys_utils import SessionPluginSigner
 
@@ -19,77 +19,111 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def get_starknet():
+async def starknet():
     return await Starknet.empty()
 
 
 @pytest.fixture(scope='module')
-def contract_classes():
+async def account_setup(starknet: Starknet):
     account_cls = compile('contracts/account/PluginAccount.cairo')
-    session_key_cls = compile('contracts/plugins/SessionKey.cairo')
     sts_plugin_cls = compile("contracts/plugins/signer/StarkSigner.cairo")
-    return account_cls, session_key_cls, sts_plugin_cls
-
-
-@pytest.fixture(scope='module')
-async def account_init(contract_classes):
-    account_cls, session_key_cls, sts_plugin_cls = contract_classes
-    starknet = await Starknet.empty()
-
-    session_key_class = await starknet.declare(contract_class=session_key_cls)
+    account_decl = await starknet.declare(contract_class=account_cls)
     sts_plugin_decl = await starknet.declare(contract_class=sts_plugin_cls)
 
     account = await starknet.deploy(contract_class=account_cls, constructor_calldata=[])
     await account.initialize(sts_plugin_decl.class_hash, [signer_key.public_key]).execute()
+    return account, account_cls, sts_plugin_decl
 
-    return starknet.state, account, session_key_class.class_hash, sts_plugin_decl.class_hash
+
+@pytest.fixture(scope='module')
+async def session_plugin_setup(starknet: Starknet):
+    session_key_cls = compile('contracts/plugins/SessionKey.cairo')
+    session_key_decl = await starknet.declare(contract_class=session_key_cls)
+    return session_key_decl
+
+
+@pytest.fixture(scope='module')
+async def dapp_setup(starknet: Starknet):
+    dapp_cls = compile('contracts/test/Dapp.cairo')
+    dapp_decl = await starknet.declare(contract_class=dapp_cls)
+    dapp = await starknet.deploy(contract_class=dapp_cls, constructor_calldata=[])
+    return dapp_cls, dapp
 
 
 @pytest.fixture
-def account_factory(contract_classes, account_init):
-    account_cls, session_key_cls, ECDSABasePlugin_cls = contract_classes
-    state, account, session_key_class, sts_plugin_hash = account_init
-    _state = state.copy()
-    account = cached_contract(_state, account_cls, account)
+async def network(starknet: Starknet, account_setup, session_plugin_setup, dapp_setup):
+    account, account_cls, sts_plugin_decl = account_setup
+    session_key_decl = session_plugin_setup
+    dapp_cls, dapp = dapp_setup
+
+    clean_state = starknet.state.copy()
+    account = cached_contract(clean_state, account_cls, account)
 
     stark_plugin_signer = StarkPluginSigner(
         stark_key=signer_key,
         account=account,
-        plugin_address=sts_plugin_hash
+        plugin_address=sts_plugin_decl.class_hash
     )
 
     session_plugin_signer = SessionPluginSigner(
         stark_key=session_key,
         account=account,
-        plugin_address=session_key_class
+        plugin_address=session_key_decl.class_hash
     )
-    return account, stark_plugin_signer, session_plugin_signer, session_key_class
+
+    dapp = cached_contract(clean_state, dapp_cls, dapp)
+
+    return account, stark_plugin_signer, session_plugin_signer, dapp
 
 
 @pytest.mark.asyncio
-async def test_addPlugin(account_factory):
-    account, stark_plugin_signer, _, session_key_class = account_factory
-
-    assert (await account.isPlugin(session_key_class).call()).result.success == 0
-    await stark_plugin_signer.add_plugin(session_key_class)
-    assert (await account.isPlugin(session_key_class).call()).result.success == 1
-
-
-@pytest.mark.asyncio
-async def test_removePlugin(account_factory):
-    account, stark_plugin_signer, _, session_key_class = account_factory
-
-    assert (await account.isPlugin(session_key_class).call()).result.success == 0
-    await stark_plugin_signer.add_plugin(session_key_class)
-    assert (await account.isPlugin(session_key_class).call()).result.success == 1
-    await stark_plugin_signer.remove_plugin(session_key_class)
-    assert (await account.isPlugin(session_key_class).call()).result.success == 0
+async def test_addPlugin(network):
+    account, stark_plugin_signer, session_plugin_signer, dapp = network
+    plugin_address = session_plugin_signer.plugin_address
+    assert (await account.isPlugin(plugin_address).call()).result.success == 0
+    await stark_plugin_signer.add_plugin(plugin_address)
+    assert (await account.isPlugin(plugin_address).call()).result.success == 1
 
 
 @pytest.mark.asyncio
-async def test_supportsInterface(account_factory):
-    account, _, _, _ = account_factory
+async def test_removePlugin(network):
+    account, stark_plugin_signer, session_plugin_signer, dapp = network
+    plugin_address = session_plugin_signer.plugin_address
+    assert (await account.isPlugin(plugin_address).call()).result.success == 0
+    await stark_plugin_signer.add_plugin(plugin_address)
+    assert (await account.isPlugin(plugin_address).call()).result.success == 1
+    await stark_plugin_signer.remove_plugin(plugin_address)
+    assert (await account.isPlugin(plugin_address).call()).result.success == 0
+
+
+@pytest.mark.asyncio
+async def test_supportsInterface(network):
+    account, stark_plugin_signer, session_plugin_signer, dapp = network
     assert (await account.supportsInterface(ERC165_INTERFACE_ID).call()).result.success == 1
     assert (await account.supportsInterface(ERC165_ACCOUNT_INTERFACE_ID).call()).result.success == 1
     assert (await account.supportsInterface(0x123).call()).result.success == 0
+
+
+@pytest.mark.asyncio
+async def test_supportsInterface(network):
+    account, stark_plugin_signer, session_plugin_signer, dapp = network
+    assert (await account.supportsInterface(ERC165_INTERFACE_ID).call()).result.success == 1
+    assert (await account.supportsInterface(ERC165_ACCOUNT_INTERFACE_ID).call()).result.success == 1
+    assert (await account.supportsInterface(0x123).call()).result.success == 0
+
+
+@pytest.mark.asyncio
+async def test_dapp(network):
+    account, stark_plugin_signer, session_plugin_signer, dapp = network
+    assert (await dapp.get_balance().call()).result.res == 0
+    tx_exec_info = await stark_plugin_signer.send_transaction(
+        calls=[(dapp.contract_address, 'set_balance', [47])],
+    )
+    assert_event_emitted(
+        tx_exec_info,
+        from_address=account.contract_address,
+        name='transaction_executed',
+        data=[]
+    )
+    assert (await dapp.get_balance().call()).result.res == 47
 
