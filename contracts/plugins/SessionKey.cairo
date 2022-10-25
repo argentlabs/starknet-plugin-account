@@ -151,6 +151,8 @@ func validate{
 func revokeSessionKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     session_key: felt
 ) {
+    assert_only_self();
+
     SessionKey_revoked_keys.write(session_key, 1);
     session_key_revoked.emit(session_key);
     return ();
@@ -280,4 +282,14 @@ func calc_merkle_root{pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     let (res) = calc_merkle_root(node, proof_len - 1, proof + 1);
     return (res,);
+}
+
+
+func assert_only_self{syscall_ptr: felt*}() -> () {
+    let (self) = get_contract_address();
+    let (caller_address) = get_caller_address();
+    with_attr error_message("SessionKey: only self") {
+        assert self = caller_address;
+    }
+    return ();
 }
