@@ -149,3 +149,8 @@ See for more details:
 ```
 nile compile
 ```
+
+### Coverage
+```
+nile coverage
+```

@@ -96,6 +96,9 @@ class PluginSigner:
 
     async def remove_plugin(self, plugin: int):
         return await self.send_transaction([(self.account.contract_address, 'removePlugin', [plugin])])
+    
+    async def getVersion(self):
+        return await self.send_transaction([(self.account.contract_address, 'getVersion', [])])
 
 
 class StarkPluginSigner(PluginSigner):

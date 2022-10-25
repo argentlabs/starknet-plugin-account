@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import logging
 from starkware.starknet.testing.starknet import Starknet
-from utils.utils import compile, build_contract, assert_event_emitted, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
+from utils.utils import compile, build_contract, assert_event_emitted, StarkKeyPair, str_to_felt, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
 from utils.plugin_signer import StarkPluginSigner
 from utils.session_keys_utils import SessionPluginSigner
 
@@ -12,6 +12,7 @@ LOGGER = logging.getLogger(__name__)
 signer_key = StarkKeyPair(123456789987654321)
 session_key = StarkKeyPair(666666666666666666)
 
+VERSION = '0.0.1'
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -99,14 +100,7 @@ async def test_supportsInterface(network):
     assert (await account.supportsInterface(ERC165_INTERFACE_ID).call()).result.success == 1
     assert (await account.supportsInterface(ERC165_ACCOUNT_INTERFACE_ID).call()).result.success == 1
     assert (await account.supportsInterface(0x123).call()).result.success == 0
-
-
-@pytest.mark.asyncio
-async def test_supportsInterface(network):
-    account, stark_plugin_signer, session_plugin_signer, dapp = network
-    assert (await account.supportsInterface(ERC165_INTERFACE_ID).call()).result.success == 1
-    assert (await account.supportsInterface(ERC165_ACCOUNT_INTERFACE_ID).call()).result.success == 1
-    assert (await account.supportsInterface(0x123).call()).result.success == 0
+    assert (await account.getVersion().call()).result.version == str_to_felt(VERSION)
 
 
 @pytest.mark.asyncio
