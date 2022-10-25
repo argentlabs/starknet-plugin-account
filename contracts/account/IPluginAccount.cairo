@@ -15,16 +15,15 @@ namespace IPluginAccount {
     func removePlugin(plugin: felt) {
     }
 
-    func setDefaultPlugin(plugin: felt) {
-    }
-
     func isPlugin(plugin: felt) -> (success: felt) {
     }
 
     func readOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
     }
 
-    func getDefaultPlugin() -> (plugin: felt) {
+    func executeOnPlugin(
+        plugin: felt, selector: felt, calldata_len: felt, calldata: felt*
+    ) -> (retdata_len: felt, retdata: felt*){
     }
 
     /////////////////////
@@ -45,11 +44,15 @@ namespace IPluginAccount {
     ) {
     }
 
-    func __validate_declare__(class_hash: felt) {
+    // Parameter temporarily named `cls_hash` instead of `class_hash` (expected).
+    // See https://github.com/starkware-libs/cairo-lang/issues/100 for details.
+    func __validate_declare__(cls_hash: felt) {
     }
 
+    // Parameter temporarily named `cls_hash` instead of `class_hash` (expected).
+    // See https://github.com/starkware-libs/cairo-lang/issues/100 for details.
     func __validate_deploy__(
-        class_hash: felt, ctr_args_len: felt, ctr_args: felt*, salt: felt
+        cls_hash: felt, ctr_args_len: felt, ctr_args: felt*, salt: felt
     ) {
     }
 

@@ -49,13 +49,6 @@ func getPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     return (public_key=public_key);
 }
 
-@view
-func isValidSignature{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
-}(hash: felt, signature_len: felt, signature: felt*) -> (isValid: felt) {
-    let (isValid) = is_valid_signature(hash, signature_len, signature);
-    return (isValid=isValid);
-}
 
 @view
 func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -79,15 +72,11 @@ func validate{
 ) {
     alloc_locals;
     let (tx_info) = get_tx_info();
-    if (tx_info.signature_len == 2) {
-        is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
-    // we take the assumption then that sig_len == 3 and sig[0] == plugin_id
-    } else {
-        is_valid_signature(tx_info.transaction_hash, tx_info.signature_len - 1, tx_info.signature + 1);
-    }
+    is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
     return ();
 }
 
+@view
 func is_valid_signature{
     syscall_ptr : felt*,
     pedersen_ptr : HashBuiltin*,
@@ -100,14 +89,15 @@ func is_valid_signature{
 ) -> (is_valid: felt) {
     let (public_key) = StarkSigner_public_key.read();
 
-    let sig_r = signature[0];
-    let sig_s = signature[1];
+    let sig_r = signature[1];
+    let sig_s = signature[2];
 
     verify_ecdsa_signature(
         message=hash,
         public_key=public_key,
         signature_r=sig_r,
-        signature_s=sig_s);
+        signature_s=sig_s
+    );
 
     return (is_valid=TRUE);
 }

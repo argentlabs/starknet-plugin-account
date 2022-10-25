@@ -60,17 +60,15 @@ The Plugin Account extends the base account interface with the following interfa
     func removePlugin(plugin: felt) {
     }
 
-    func setDefaultPlugin(plugin: felt) {
-    }
-
     func isPlugin(plugin: felt) -> (success: felt) {
     }
 
     func readOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
     }
 
-    func getDefaultPlugin() -> (plugin: felt) {
+    func executeOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) -> (retdata_len: felt, retdata: felt*){
     }
+
 ```
 
 A plugin must expose the following interface:
@@ -81,6 +79,12 @@ namespace IPlugin {
     func initialize(
         calldata_len: felt,
         calldata: felt*) {}
+
+    func is_valid_signature(
+        hash: felt, 
+        sig_len: felt,
+        sig: felt*
+    ) -> (isValid: felt) {}
 
     func validate(
         call_array_len: felt,
@@ -99,42 +103,38 @@ For every transaction the caller can instruct the account to validate the multi-
 
 We note that the plugin must be called with a `library_call` to comply to the constraints of the `__validate__` method, which prevents accessing the storage of other contracts. I.e. the logic of the plugin is executed in the context of the account and the state of the plugin, if any, must be stored in the account.
 
-To instruct the account to use a specific plugin we leverage the transaction signature data. By convention, the first item in the signature data specifies the class hash of the plugin which should be used for validation. If no valid plugin is specified the default plugin is used. Any additional context necessary to validate the transaction, such as the signature itself, should be appended to the signature data.
+To instruct the account to use a specific plugin we leverage the transaction signature data. By convention, the first item in the signature data specifies the class hash of the plugin which should be used for validation. Any additional context necessary to validate the transaction, such as the signature itself, should be appended to the signature data.
 
 So to validate a call using a specific plugin, the signature data should look like `[pluginClassHash, ...]`
 
 Similarly, the `isValidSignature` will validate a signature using the provided plugin in the passed signature data.
 
-### The default Plugin:
-
-If no plugin is specified, the default plugin is used to validate the transaction. There must always be a default plugin defined and this plugin must be properly initialised.
-
-The default plugin is also used to implement the `supportsInterface` method of the account.
-
-The default plugin can be changed with the method `setDefaultPlugin`.
-
 ### Changing the state of a plugin:
 
-To manipulate the state of a plugin, the account has a `__default__` method that will be called when a multi-call specifies a call to the account with an unknown selector.  The plugin to call is the one used for the validation.
+To manipulate the state of a plugin, the account has a `executeOnPlugin` that can be only called from the wallet
 
 ### Reading the state of a plugin:
 
 The view methods of a plugin can be accessed through the `readOnPlugin` method.
-
-The view methods of the default plugin can also be accessed through the `__default__` method.
 
 ## Development
 
 ### Setup a local virtual env
 
 ```
-python -m venv ./venv
+python3.9 -m venv ./venv
 source ./venv/bin/activate
 ```
 
 ### Install Cairo dependencies
 ```
 brew install gmp
+```
+
+You might need this extra step if you are running on a Mac with the M1 chip
+
+```
+CFLAGS=-I`brew --prefix gmp`/include LDFLAGS=-L`brew --prefix gmp`/lib pip install ecdsa fastecdsa sympy
 ```
 
 ```
@@ -148,4 +148,9 @@ See for more details:
 ### Compile the contracts
 ```
 nile compile
+```
+
+### Coverage
+```
+nile coverage
 ```
