@@ -8,6 +8,9 @@ from starkware.starknet.compiler.compile import get_selector_from_name
 from starkware.starknet.business_logic.execution.objects import Event
 from typing import Optional, List, Tuple
 from starkware.crypto.signature.signature import private_to_stark_key, sign
+from starkware.starknet.public.abi import AbiType
+from starkware.starknet.definitions.error_codes import StarknetErrorCode
+
 
 ERC165_INTERFACE_ID = 0x01ffc9a7
 ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f
@@ -20,24 +23,38 @@ def compile(path: str) -> ContractClass:
     contract_cls = compile_starknet_files([path], debug_info=True)
     return contract_cls
 
+
 def cached_contract(state: StarknetState, _class: ContractClass, deployed: StarknetContract) -> StarknetContract:
-    contract = StarknetContract(
+    return build_contract(
         state=state,
-        abi=_class.abi,
-        contract_address=deployed.contract_address,
-        deploy_call_info=deployed.deploy_call_info
+        contract=deployed,
+        custom_abi=_class.abi
     )
-    return contract
 
 
-async def assert_revert(fun, reverted_with=None):
+def copy_contract_state(contract: StarknetContract) -> StarknetContract:
+    return build_contract(contract=contract, state=contract.state.copy())
+
+
+def build_contract(contract: StarknetContract, state: StarknetState = None,  custom_abi: AbiType = None) -> StarknetContract:
+    return StarknetContract(
+        state=contract.state if state is None else state,
+        abi=contract.abi if custom_abi is None else custom_abi,
+        contract_address=contract.contract_address,
+        deploy_call_info=contract.deploy_call_info
+    )
+
+
+async def assert_revert(fun, reverted_with: Optional[str] = None):
     try:
-        await fun
-        assert False
+        res = await fun
+        assert False, "Transaction didn't revert as expected"
     except StarkException as err:
         _, error = err.args
+        assert error['code'] == StarknetErrorCode.TRANSACTION_FAILED, f"assert expected: {StarknetErrorCode.TRANSACTION_FAILED}, got error: {error['code']}"
         if reverted_with is not None:
-            assert reverted_with in error['message']
+            errors_found = [s.removeprefix("Error message: ") for s in error['message'].splitlines() if s.startswith("Error message: ")]
+            assert reverted_with in errors_found, f"assert expected: {reverted_with}, found errors: {errors_found}"
 
 
 def assert_event_emitted(tx_exec_info, from_address, name, data = []):

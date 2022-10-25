@@ -7,7 +7,7 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import calcula
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction, Declare
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.compiler.compile import get_selector_from_name
-from utils.utils import from_call_to_call_array, StarkKeyPair
+from utils.utils import from_call_to_call_array, StarkKeyPair, cached_contract, copy_contract_state
 TRANSACTION_VERSION = 1
 
 
@@ -20,14 +20,25 @@ class PluginSigner:
     def sign(self, message_hash: int) -> List[int]:
         ...
 
-    async def send_transaction(self, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
+    async def send_transaction(self, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo:
+        return await self.send_signed_tx(await self.get_signed_transaction(calls, nonce, max_fee))
+
+    async def send_signed_tx(self, signed_tx: InvokeFunction) -> TransactionExecutionInfo :
+        return await self.account.state.execute_tx(
+            tx=InternalTransaction.from_external(
+                external_tx=signed_tx,
+                general_config=self.account.state.general_config
+            )
+        )
+
+    async def get_signed_transaction(self, calls, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> InvokeFunction:
         call_array, calldata = from_call_to_call_array(calls)
 
-        raw_invocation = self.account.__execute__(call_array, calldata)
-        state = raw_invocation.state
+        account_copy = copy_contract_state(self.account)
+        raw_invocation = account_copy.__execute__(call_array, calldata)
 
         if nonce is None:
-            nonce = await state.state.get_nonce_at(contract_address=self.account.contract_address)
+            nonce = await raw_invocation.state.state.get_nonce_at(contract_address=account_copy.contract_address)
 
         transaction_hash = calculate_transaction_hash_common(
             tx_hash_prefix=TransactionHashPrefix.INVOKE,
@@ -51,12 +62,7 @@ class PluginSigner:
             version=TRANSACTION_VERSION,
             nonce=nonce,
         )
-
-        tx = InternalTransaction.from_external(
-            external_tx=external_tx, general_config=state.general_config
-        )
-        execution_info = await state.execute_tx(tx=tx)
-        return execution_info
+        return external_tx
 
     async def execute_on_plugin(self, selector_name, arguments=None, plugin=None):
         if arguments is None:

@@ -104,6 +104,14 @@ func validate{
         let session_token = tx_info.signature + session_token_offset + 1;
     }
 
+    with_attr error_message("SessionKey: invalid proof len") {
+         assert proofs_len = call_array_len * proof_len;
+    }
+
+    with_attr error_message("SessionKey: invalid signature length") {
+        assert tx_info.signature_len = session_token_offset + 1 + session_token_len;
+    }
+
     with_attr error_message("SessionKey: session expired") {
         let (now) = get_block_timestamp();
         assert_nn(session_expires - now);

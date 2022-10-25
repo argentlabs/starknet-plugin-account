@@ -5,7 +5,7 @@ from starkware.starknet.compiler.compile import get_selector_from_name
 from utils.utils import str_to_felt
 from utils.plugin_signer import PluginSigner, TRANSACTION_VERSION
 from dataclasses import dataclass
-from utils.utils import from_call_to_call_array, StarkKeyPair
+from utils.utils import from_call_to_call_array, copy_contract_state, StarkKeyPair
 from starkware.starknet.testing.contract import StarknetContract
 from starkware.starknet.core.os.transaction_hash.transaction_hash import calculate_transaction_hash_common, TransactionHashPrefix
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
@@ -82,21 +82,22 @@ class SessionPluginSigner(PluginSigner):
     def sign(self, message_hash: int) -> List[int]:
         raise Exception("SessionPluginSigner can't sign arbitrary messages")
 
-    async def send_transaction(self, calls, session: Session, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
+    async def get_signed_transaction(self, calls, session: Session, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> InvokeFunction:
         proofs = []
         for call in calls:
             call_proof_index = session.allowed_calls.index((call[0], call[1]))
             proofs.append(session.proofs[call_proof_index])
-        return await self.send_transaction_with_proofs(calls, session, proofs, nonce, max_fee)
+        return await self.get_signed_transaction_with_proofs(calls, session, proofs, nonce, max_fee)
 
-    async def send_transaction_with_proofs(self, calls, session: Session, proofs: List[List[int]], nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
+    async def get_signed_transaction_with_proofs(self, calls, session: Session, proofs: List[List[int]], nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> InvokeFunction:
         call_array, calldata = from_call_to_call_array(calls)
 
-        raw_invocation = self.account.__execute__(call_array, calldata)
-        state = raw_invocation.state
+        account_copy = copy_contract_state(self.account)
+
+        raw_invocation = account_copy.__execute__(call_array, calldata)
 
         if nonce is None:
-            nonce = await state.state.get_nonce_at(contract_address=self.account.contract_address)
+            nonce = await raw_invocation.state.state.get_nonce_at(contract_address=account_copy.contract_address)
 
         transaction_hash = calculate_transaction_hash_common(
             tx_hash_prefix=TransactionHashPrefix.INVOKE,
@@ -124,7 +125,7 @@ class SessionPluginSigner(PluginSigner):
             *session.session_token       # session_token
         ]
 
-        external_tx = InvokeFunction(
+        return InvokeFunction(
             contract_address=self.account.contract_address,
             calldata=raw_invocation.calldata,
             entry_point_selector=None,
@@ -134,8 +135,18 @@ class SessionPluginSigner(PluginSigner):
             nonce=nonce,
         )
 
-        tx = InternalTransaction.from_external(
-            external_tx=external_tx, general_config=state.general_config
+    async def send_transaction(self, calls, session: Session, nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo:
+        signed_tx = await self.get_signed_transaction(calls, session, nonce, max_fee)
+        return await self.send_signed_tx(signed_tx)
+
+    async def send_transaction_with_proofs(self, calls, session: Session, proofs: List[List[int]], nonce: Optional[int] = None, max_fee: Optional[int] = 0) -> TransactionExecutionInfo :
+        signed_tx = await self.get_signed_transaction_with_proofs(calls, session, proofs, nonce, max_fee)
+        return await self.send_signed_tx(signed_tx)
+
+    async def send_signed_tx(self, signed_tx: InvokeFunction) -> TransactionExecutionInfo:
+        return await self.account.state.execute_tx(
+            tx=InternalTransaction.from_external(
+                external_tx=signed_tx,
+                general_config=self.account.state.general_config
+            )
         )
-        execution_info = await state.execute_tx(tx=tx)
-        return execution_info

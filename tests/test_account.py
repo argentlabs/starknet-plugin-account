@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import logging
 from starkware.starknet.testing.starknet import Starknet
-from utils.utils import compile, cached_contract, assert_event_emitted, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
+from utils.utils import compile, build_contract, assert_event_emitted, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID
 from utils.plugin_signer import StarkPluginSigner
 from utils.session_keys_utils import SessionPluginSigner
 
@@ -45,19 +45,17 @@ async def session_plugin_setup(starknet: Starknet):
 @pytest.fixture(scope='module')
 async def dapp_setup(starknet: Starknet):
     dapp_cls = compile('contracts/test/Dapp.cairo')
-    dapp_decl = await starknet.declare(contract_class=dapp_cls)
-    dapp = await starknet.deploy(contract_class=dapp_cls, constructor_calldata=[])
-    return dapp_cls, dapp
+    await starknet.declare(contract_class=dapp_cls)
+    return await starknet.deploy(contract_class=dapp_cls, constructor_calldata=[])
 
 
 @pytest.fixture
 async def network(starknet: Starknet, account_setup, session_plugin_setup, dapp_setup):
     account, account_cls, sts_plugin_decl = account_setup
     session_key_decl = session_plugin_setup
-    dapp_cls, dapp = dapp_setup
 
     clean_state = starknet.state.copy()
-    account = cached_contract(clean_state, account_cls, account)
+    account = build_contract(account, state=clean_state)
 
     stark_plugin_signer = StarkPluginSigner(
         stark_key=signer_key,
@@ -70,8 +68,7 @@ async def network(starknet: Starknet, account_setup, session_plugin_setup, dapp_
         account=account,
         plugin_address=session_key_decl.class_hash
     )
-
-    dapp = cached_contract(clean_state, dapp_cls, dapp)
+    dapp = build_contract(dapp_setup, state=clean_state)
 
     return account, stark_plugin_signer, session_plugin_signer, dapp
 
