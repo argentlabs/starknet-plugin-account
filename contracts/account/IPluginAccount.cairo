@@ -18,10 +18,6 @@ namespace IPluginAccount {
     func isPlugin(plugin: felt) -> (success: felt) {
     }
 
-    ///////////// TODO, improve this
-    ///////////// Despite the name this method can actually execute on the plugins
-    func readOnPlugin(plugin: felt, selector: felt, calldata_len: felt, calldata: felt*) {
-    }
 
     func executeOnPlugin(
         plugin: felt, selector: felt, calldata_len: felt, calldata: felt*

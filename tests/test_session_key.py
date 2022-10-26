@@ -305,12 +305,5 @@ async def test_executeOnPlugin(starknet: Starknet, contracts):
         stark_plugin_signer_2.send_transaction(
             [(stark_plugin_signer.account.contract_address, 'executeOnPlugin', exec_arguments)]
         ),
-        reverted_with="PluginAccount: only self"
-    )
-
-    await assert_revert(
-        stark_plugin_signer_2.send_transaction(
-            [(stark_plugin_signer.account.contract_address, 'readOnPlugin', exec_arguments)]
-        ),
         reverted_with="SessionKey: only self"
     )

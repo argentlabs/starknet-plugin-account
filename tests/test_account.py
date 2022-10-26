@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import logging
 from starkware.starknet.testing.starknet import Starknet
-from utils.utils import compile, build_contract, assert_event_emitted, StarkKeyPair, assert_revert
+from utils.utils import compile, build_contract, StarkKeyPair, ERC165_INTERFACE_ID, ERC165_ACCOUNT_INTERFACE_ID, assert_event_emitted, assert_revert, str_to_felt
 from utils.plugin_signer import StarkPluginSigner
 from utils.session_keys_utils import SessionPluginSigner
 from starkware.starknet.compiler.compile import get_selector_from_name
@@ -147,13 +147,8 @@ async def test_executeOnPlugin(network):
     ]
     await assert_revert(
         stark_plugin_signer_2.send_transaction(calls=[(stark_plugin_signer.account.contract_address, 'executeOnPlugin', exec_arguments)]),
-        reverted_with="PluginAccount: only self"
-    )
-
-    await assert_revert(
-        stark_plugin_signer_2.send_transaction(
-            calls=[(stark_plugin_signer.account.contract_address, 'readOnPlugin', exec_arguments)]),
         reverted_with="StarkSigner: only self"
     )
+
     read_execution_info = await stark_plugin_signer.read_on_plugin("getPublicKey")
     assert read_execution_info.result[0] == [signer_key.public_key]

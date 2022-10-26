@@ -87,7 +87,7 @@ class PluginSigner:
             plugin = self.plugin_address
 
         selector = get_selector_from_name(selector_name)
-        return await self.account.readOnPlugin(plugin, selector, arguments).call()
+        return await self.account.executeOnPlugin(plugin, selector, arguments).call()
 
     async def add_plugin(self, plugin: int, plugin_arguments=None):
         if plugin_arguments is None:
