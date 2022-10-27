@@ -294,7 +294,7 @@ async def test_executeOnPlugin(starknet: Starknet, contracts):
         account_address=account.contract_address
     )
 
-    revoke_session_key_arguments = [session.session_hash]
+    revoke_session_key_arguments = [session.session_public_key]
     exec_arguments = [
         session_plugin_signer.plugin_address,
         get_selector_from_name("revokeSessionKey"),
