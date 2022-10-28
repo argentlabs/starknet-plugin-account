@@ -87,6 +87,11 @@ func is_valid_signature{
     signature_len: felt,
     signature: felt*
 ) -> (is_valid: felt) {
+
+    with_attr error_message("StarkSigner: invalid signature length") {
+        assert signature_len = 3;
+    }
+    
     let (public_key) = StarkSigner_public_key.read();
 
     let sig_r = signature[1];
