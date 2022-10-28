@@ -45,7 +45,7 @@ async def dapp(starknet: Starknet):
 
 @pytest.fixture
 def contracts(starknet: Starknet, account_setup, dapp):
-    account, sts_plugin_address = account_setup
+    account, sts_plugin_class_hash = account_setup
     clean_state = starknet.state.copy()
 
     account = build_contract(account, state=clean_state)
@@ -53,12 +53,12 @@ def contracts(starknet: Starknet, account_setup, dapp):
     stark_plugin_signer = StarkPluginSigner(
         stark_key=key_pair,
         account=account,
-        plugin_address=sts_plugin_address
+        plugin_class_hash=sts_plugin_class_hash
     )
 
     dapp = build_contract(dapp, state=clean_state)
 
-    return account, stark_plugin_signer, sts_plugin_address, dapp
+    return account, stark_plugin_signer, sts_plugin_class_hash, dapp
 
 
 @pytest.mark.asyncio

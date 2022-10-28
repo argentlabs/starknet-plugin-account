@@ -12,9 +12,9 @@ TRANSACTION_VERSION = 1
 
 
 class PluginSigner:
-    def __init__(self, account: StarknetContract, plugin_address):
+    def __init__(self, account: StarknetContract, plugin_class_hash):
         self.account = account
-        self.plugin_address = plugin_address
+        self.plugin_class_hash = plugin_class_hash
 
     @abstractmethod
     def sign(self, message_hash: int) -> List[int]:
@@ -69,7 +69,7 @@ class PluginSigner:
             arguments = []
 
         if plugin is None:
-            plugin = self.plugin_address
+            plugin = self.plugin_class_hash
 
         exec_arguments = [
             plugin,
@@ -84,7 +84,7 @@ class PluginSigner:
             arguments = []
 
         if plugin is None:
-            plugin = self.plugin_address
+            plugin = self.plugin_class_hash
 
         selector = get_selector_from_name(selector_name)
         return await self.account.executeOnPlugin(plugin, selector, arguments).call()
@@ -102,10 +102,10 @@ class PluginSigner:
 
 
 class StarkPluginSigner(PluginSigner):
-    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
-        super().__init__(account, plugin_address)
+    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_class_hash):
+        super().__init__(account, plugin_class_hash)
         self.stark_key = stark_key
         self.public_key = stark_key.public_key
 
     def sign(self, message_hash: int) -> List[int]:
-        return [self.plugin_address] + list(self.stark_key.sign(message_hash))
+        return [self.plugin_class_hash] + list(self.stark_key.sign(message_hash))

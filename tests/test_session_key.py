@@ -74,7 +74,7 @@ async def dapp_setup(starknet: Starknet):
 
 @pytest.fixture
 def contracts(starknet: Starknet, account_setup, dapp_setup):
-    account, account_2, session_plugin_address, sts_plugin_address = account_setup
+    account, account_2, session_plugin_class_hash, sts_plugin_class_hash = account_setup
     dapp1, dapp2 = dapp_setup
     clean_state = starknet.state.copy()
 
@@ -87,22 +87,22 @@ def contracts(starknet: Starknet, account_setup, dapp_setup):
     stark_plugin_signer = StarkPluginSigner(
         stark_key=signer_key,
         account=account,
-        plugin_address=sts_plugin_address
+        plugin_class_hash=sts_plugin_class_hash
     )
 
     stark_plugin_signer_2 = StarkPluginSigner(
         stark_key=signer_key_2,
         account=account_2,
-        plugin_address=sts_plugin_address
+        plugin_class_hash=sts_plugin_class_hash
     )
 
     session_plugin_signer = SessionPluginSigner(
         stark_key=session_key,
         account=account,
-        plugin_address=session_plugin_address
+        plugin_class_hash=session_plugin_class_hash
     )
 
-    return account, stark_plugin_signer, stark_plugin_signer_2, session_plugin_signer, dapp1, dapp2, session_plugin_address
+    return account, stark_plugin_signer, stark_plugin_signer_2, session_plugin_signer, dapp1, dapp2, session_plugin_class_hash
 
 
 @pytest.mark.asyncio
@@ -296,7 +296,7 @@ async def test_executeOnPlugin(starknet: Starknet, contracts):
 
     revoke_session_key_arguments = [session.session_public_key]
     exec_arguments = [
-        session_plugin_signer.plugin_address,
+        session_plugin_signer.plugin_class_hash,
         get_selector_from_name("revokeSessionKey"),
         len(revoke_session_key_arguments),
         *revoke_session_key_arguments

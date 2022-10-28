@@ -74,8 +74,8 @@ def build_session(signer, allowed_calls: List[AllowedCall], session_public_key: 
 
 
 class SessionPluginSigner(PluginSigner):
-    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_address):
-        super().__init__(account, plugin_address)
+    def __init__(self, stark_key: StarkKeyPair, account: StarknetContract, plugin_class_hash):
+        super().__init__(account, plugin_class_hash)
         self.stark_key = stark_key
         self.public_key = stark_key.public_key
 
@@ -113,7 +113,7 @@ class SessionPluginSigner(PluginSigner):
         session_signature = self.stark_key.sign(transaction_hash)
         proofs_flat = [item for proof in proofs for item in proof]
         signature = [
-            self.plugin_address,
+            self.plugin_class_hash,
             *session_signature,          # session signature
             session.session_public_key,  # session_key
             session.session_expiration,  # expiration

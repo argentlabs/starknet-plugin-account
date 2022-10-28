@@ -66,19 +66,19 @@ async def network(starknet: Starknet, account_setup, session_plugin_setup, dapp_
     stark_plugin_signer = StarkPluginSigner(
         stark_key=signer_key,
         account=account,
-        plugin_address=sts_plugin_decl.class_hash
+        plugin_class_hash=sts_plugin_decl.class_hash
     )
 
     stark_plugin_signer_2 = StarkPluginSigner(
         stark_key=signer_key_2,
         account=account_2,
-        plugin_address=sts_plugin_decl.class_hash
+        plugin_class_hash=sts_plugin_decl.class_hash
     )
 
     session_plugin_signer = SessionPluginSigner(
         stark_key=session_key,
         account=account,
-        plugin_address=session_key_decl.class_hash
+        plugin_class_hash=session_key_decl.class_hash
     )
     dapp = build_contract(dapp_setup, state=clean_state)
 
@@ -88,21 +88,21 @@ async def network(starknet: Starknet, account_setup, session_plugin_setup, dapp_
 @pytest.mark.asyncio
 async def test_addPlugin(network):
     account, stark_plugin_signer, stark_plugin_signer_2, session_plugin_signer, dapp = network
-    plugin_address = session_plugin_signer.plugin_address
-    assert (await account.isPlugin(plugin_address).call()).result.success == 0
-    await stark_plugin_signer.add_plugin(plugin_address)
-    assert (await account.isPlugin(plugin_address).call()).result.success == 1
+    plugin_class_hash = session_plugin_signer.plugin_class_hash
+    assert (await account.isPlugin(plugin_class_hash).call()).result.success == 0
+    await stark_plugin_signer.add_plugin(plugin_class_hash)
+    assert (await account.isPlugin(plugin_class_hash).call()).result.success == 1
 
 
 @pytest.mark.asyncio
 async def test_removePlugin(network):
     account, stark_plugin_signer, stark_plugin_signer_2, session_plugin_signer, dapp = network
-    plugin_address = session_plugin_signer.plugin_address
-    assert (await account.isPlugin(plugin_address).call()).result.success == 0
-    await stark_plugin_signer.add_plugin(plugin_address)
-    assert (await account.isPlugin(plugin_address).call()).result.success == 1
-    await stark_plugin_signer.remove_plugin(plugin_address)
-    assert (await account.isPlugin(plugin_address).call()).result.success == 0
+    plugin_class_hash = session_plugin_signer.plugin_class_hash
+    assert (await account.isPlugin(plugin_class_hash).call()).result.success == 0
+    await stark_plugin_signer.add_plugin(plugin_class_hash)
+    assert (await account.isPlugin(plugin_class_hash).call()).result.success == 1
+    await stark_plugin_signer.remove_plugin(plugin_class_hash)
+    assert (await account.isPlugin(plugin_class_hash).call()).result.success == 0
 
 
 @pytest.mark.asyncio
@@ -140,7 +140,7 @@ async def test_executeOnPlugin(network):
 
     set_public_key_arguments = [signer_key_2.public_key]
     exec_arguments = [
-        stark_plugin_signer.plugin_address,
+        stark_plugin_signer.plugin_class_hash,
         get_selector_from_name("setPublicKey"),
         len(set_public_key_arguments),
         *set_public_key_arguments
