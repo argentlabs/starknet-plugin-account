@@ -94,6 +94,32 @@ func executeOnPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return PluginAccount.execute_on_plugin(plugin, selector, calldata_len, calldata);
 }
 
+@external
+func upgrade{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    implementation: felt
+) {
+    // only called via execute
+    assert_only_self();
+    // make sure the target is an account
+    with_attr error_message("PluginAccount: invalid implementation") {
+        let (calldata: felt*) = alloc();
+        assert calldata[0] = ERC165_ACCOUNT_INTERFACE_ID;
+        let (retdata_size: felt, retdata: felt*) = library_call(
+            class_hash=implementation,
+            function_selector=SUPPORTS_INTERFACE_SELECTOR,
+            calldata_size=1,
+            calldata=calldata,
+        );
+        assert retdata_size = 1;
+        assert [retdata] = TRUE;
+    }
+    // change implementation
+    _set_implementation(implementation);
+    account_upgraded.emit(new_implementation=implementation);
+
+    return ();
+}
+
 /////////////////////
 // VIEW FUNCTIONS
 /////////////////////

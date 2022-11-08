@@ -35,6 +35,9 @@ namespace IPluginAccount {
     // IAccount
     /////////////////////
 
+    func upgrade(implementation: felt) {
+    }
+
     func supportsInterface(interfaceId: felt) -> (success: felt) {
     }
 

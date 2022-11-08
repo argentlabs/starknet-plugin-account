@@ -1,0 +1,13 @@
+["protostar.config"]
+protostar_version = "0.6.0"
+
+["protostar.project"]
+libs_path = "lib"
+
+["protostar.contracts"]
+account = [
+    "contracts/account/PluginAccount.cairo",
+]
+signer = [
+    "contracts/plugins/signer/StarkSigner.cairo"
+]
