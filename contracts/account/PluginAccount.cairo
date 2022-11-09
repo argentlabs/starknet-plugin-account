@@ -1,8 +1,12 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from contracts.account.library import PluginAccount
-from contracts.account.IPluginAccount import CallArray
+from starkware.cairo.common.alloc import alloc
+from starkware.starknet.common.syscalls import library_call
+from starkware.cairo.common.bool import TRUE
+
+from contracts.account.library import CallArray, PluginAccount, ERC165_ACCOUNT_INTERFACE_ID
+from contracts.upgrade.Upgradable import _set_implementation
 
 /////////////////////
 // CONSTANTS
@@ -10,6 +14,15 @@ from contracts.account.IPluginAccount import CallArray
 
 const NAME = 'PluginAccount';
 const VERSION = '0.0.1';
+const SUPPORTS_INTERFACE_SELECTOR = 1184015894760294494673613438913361435336722154500302038630992932234692784845;
+
+/////////////////////
+// EVENTS
+/////////////////////
+
+@event
+func account_upgraded(new_implementation: felt) {
+}
 
 /////////////////////
 // PROTOCOL
@@ -22,20 +35,6 @@ func __validate__{
     call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
 ) {
     PluginAccount.validate(call_array_len, call_array, calldata_len, calldata);
-    return ();
-}
-
-@external
-func __validate_deploy__{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    ecdsa_ptr: SignatureBuiltin*,
-    range_check_ptr
-} (
-    class_hash: felt,
-    contract_address_salt: felt
-) {
-    PluginAccount.validate_deploy();
     return ();
 }
 
@@ -99,7 +98,7 @@ func upgrade{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     implementation: felt
 ) {
     // only called via execute
-    assert_only_self();
+    PluginAccount.assert_only_self();
     // make sure the target is an account
     with_attr error_message("PluginAccount: invalid implementation") {
         let (calldata: felt*) = alloc();
