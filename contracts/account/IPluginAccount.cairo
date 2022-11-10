@@ -1,6 +1,13 @@
 %lang starknet
 
-from contracts.account.library import CallArray
+// Tmp struct introduced while we wait for Cairo
+// to support passing `[Call]` to __execute__
+struct CallArray {
+    to: felt,
+    selector: felt,
+    data_offset: felt,
+    data_len: felt,
+}
 
 @contract_interface
 namespace IPluginAccount {

@@ -12,6 +12,7 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
 )
 from starkware.cairo.common.bool import TRUE, FALSE
+from contracts.account.IPluginAccount import CallArray
 
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
 
@@ -20,15 +21,6 @@ struct Call {
     selector: felt,
     calldata_len: felt,
     calldata: felt*,
-}
-
-// Tmp struct introduced while we wait for Cairo
-// to support passing `[Call]` to __execute__
-struct CallArray {
-    to: felt,
-    selector: felt,
-    data_offset: felt,
-    data_len: felt,
 }
 
 /////////////////////

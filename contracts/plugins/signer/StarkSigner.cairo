@@ -4,7 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from contracts.account.library import CallArray
+from contracts.account.IPluginAccount import CallArray
 from starkware.starknet.common.syscalls import (
     get_tx_info,
     get_contract_address,
