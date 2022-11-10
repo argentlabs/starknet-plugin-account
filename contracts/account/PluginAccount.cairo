@@ -1,7 +1,8 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from contracts.account.library import CallArray, PluginAccount
+from contracts.account.library import PluginAccount
+from contracts.account.IPluginAccount import CallArray
 
 /////////////////////
 // CONSTANTS

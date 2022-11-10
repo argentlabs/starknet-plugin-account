@@ -22,6 +22,7 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
     get_block_timestamp,
 )
+from contracts.account.IPluginAccount import CallArray
 
 // H('StarkNetDomain(chainId:felt)')
 const STARKNET_DOMAIN_TYPE_HASH = 0x13cda234a04d66db62c06b8e3ad5f91bd0c67286c2c7519a826cf49da6ba478;
@@ -34,13 +35,6 @@ const POLICY_TYPE_HASH = 0x2f0026e78543f036f33e26a8f5891b88c58dc1e20cbbfaf0bb532
 namespace IAccount {
     func isValidSignature(hash: felt, sig_len: felt, sig: felt*) {
     }
-}
-
-struct CallArray {
-    to: felt,
-    selector: felt,
-    data_offset: felt,
-    data_len: felt,
 }
 
 @event
