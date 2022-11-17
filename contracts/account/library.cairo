@@ -13,6 +13,7 @@ from starkware.starknet.common.syscalls import (
 )
 from starkware.cairo.common.bool import TRUE, FALSE
 from contracts.account.IPluginAccount import CallArray
+from contracts.plugins.IPlugin import IPlugin
 
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
 
@@ -21,30 +22,6 @@ struct Call {
     selector: felt,
     calldata_len: felt,
     calldata: felt*,
-}
-
-/////////////////////
-// INTERFACES
-/////////////////////
-
-@contract_interface
-namespace IPlugin {
-    func initialize(data_len: felt, data: felt*) {
-    }
-
-    func is_valid_signature(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
-    }
-
-    func supportsInterface(interfaceId: felt) -> (success: felt) {
-    }
-
-    func validate(
-        call_array_len: felt,
-        call_array: CallArray*,
-        calldata_len: felt,
-        calldata: felt*,
-    ) {
-    }
 }
 
 /////////////////////
@@ -101,20 +78,47 @@ namespace PluginAccount {
         call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
     ) {
         alloc_locals;
-
         assert_initialized();
 
         let (tx_info) = get_tx_info();
-        let (plugin) = get_plugin_from_signature(tx_info.signature_len, tx_info.signature);
+
+        inner_validate(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata);
+
+        return ();
+    }
+
+    func inner_validate{
+        syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+    }(
+        hash: felt, 
+        sig_len: felt,
+        sig: felt*,
+        call_array_len: felt, 
+        call_array: CallArray*, 
+        calldata_len: felt, 
+        calldata: felt*
+    ) {
+        alloc_locals;
+
+        if (sig_len == 0) {
+            return ();
+        }
+
+        let plugin_id = sig[0];
+        let plugin_sig_len = sig[1];
 
         IPlugin.library_call_validate(
-            class_hash=plugin,
+            class_hash=plugin_id,
+            hash=hash,
+            sig_len=plugin_sig_len,
+            sig=sig + 2,
             call_array_len=call_array_len,
             call_array=call_array,
             calldata_len=calldata_len,
             calldata=calldata,
         );
-        return ();
+
+        return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, call_array_len, call_array, calldata_len, calldata);
     }
 
     func validate_deploy{
@@ -154,12 +158,17 @@ namespace PluginAccount {
         //////////////////////////////////////////
 
         let (response: felt*) = alloc();
-        let (response_len) = execute_list(calls_len, calls, response);
+        let (response_len, response) = inner_execute(
+            tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata, 0, response,
+        );
+
         transaction_executed.emit(
             hash=tx_info.transaction_hash, response_len=response_len, response=response
         );
-        return (response_len, response);
+
+        return (response_len=response_len, response=response);
     }
+
 
     func add_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
         assert_only_self();
@@ -226,8 +235,8 @@ namespace PluginAccount {
         let (is_valid) = IPlugin.library_call_is_valid_signature(
             class_hash=plugin,
             hash=hash,
-            sig_len=sig_len,
-            sig=sig
+            sig_len=sig[1],
+            sig=sig + 2
         );
 
         return (is_valid=is_valid);
@@ -312,6 +321,53 @@ namespace PluginAccount {
             assert_not_zero(initialized);
         }
         return ();
+    }
+
+    func inner_execute{
+        syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+    }(
+        sig_len: felt,
+        sig: felt*,
+        call_array_len: felt, 
+        call_array: CallArray*, 
+        calldata_len: felt, 
+        calldata: felt*,
+        response_len: felt,
+        response: felt*,
+    ) -> (response_len: felt, response: felt*) {
+        alloc_locals;
+
+        // TMP? Avoid erasing response after execute with plugin
+        if (response_len != 0) {
+            return (response_len, response);
+        }
+
+        if (sig_len == 0) {
+
+            /////////////// TMP /////////////////////
+            // parse inputs to an array of 'Call' struct
+            let (calls: Call*) = alloc();
+            from_call_array_to_call(call_array_len, call_array, calldata, calls);
+            let calls_len = call_array_len;
+            //////////////////////////////////////////
+            let (response: felt*) = alloc();
+            let (plugin_response_len) = execute_list(calls_len, calls, response);
+            memcpy(response, response, plugin_response_len);
+            return (response_len + plugin_response_len, response);
+        }
+
+        let plugin_id = sig[0];
+        let plugin_sig_len = sig[1];
+        let (plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, plugin_response_len, plugin_response) = IPlugin.library_call_execute(
+            class_hash=plugin_id,
+            call_array_len=call_array_len,
+            call_array=call_array,
+            calldata_len=calldata_len,
+            calldata=calldata,
+        );
+
+        memcpy(response, plugin_response, plugin_response_len);
+        return inner_execute(sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, response_len + plugin_response_len, response);
     }
 
     // @notice Executes a list of contract calls recursively.

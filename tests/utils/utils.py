@@ -20,7 +20,7 @@ def str_to_felt(text: str) -> int:
     return int.from_bytes(b_text, "big")
 
 def compile(path: str) -> ContractClass:
-    contract_cls = compile_starknet_files([path], debug_info=True)
+    contract_cls = compile_starknet_files([path], debug_info=True, disable_hint_validation=True)
     return contract_cls
 
 

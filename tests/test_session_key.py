@@ -246,7 +246,7 @@ async def test_dapp_long_signature(starknet: Starknet, contracts):
         calls=[(dapp.contract_address, 'set_balance', [47])],
         session=session
     )
-    index_proofs_len = 7
+    index_proofs_len = 8
     proofs_len = signed_tx.signature[index_proofs_len]
     index_session_token_len = index_proofs_len + proofs_len + 1
     assert signed_tx.signature[index_session_token_len] == len(session.session_token)

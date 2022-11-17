@@ -4,7 +4,8 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from contracts.account.IPluginAccount import CallArray
+from starkware.cairo.common.alloc import alloc
+from contracts.account.library import CallArray
 from starkware.starknet.common.syscalls import (
     get_tx_info,
     get_contract_address,
@@ -13,6 +14,21 @@ from starkware.starknet.common.syscalls import (
 
 @storage_var
 func StarkSigner_public_key() -> (res: felt) {
+}
+
+@external
+func execute(
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*,
+) -> (
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*, response_len: felt, response: felt*) {
+    let (response: felt*) = alloc();
+    return (call_array_len, call_array, calldata_len, calldata, 0, response);
 }
 
 @external
@@ -49,6 +65,13 @@ func getPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     return (public_key=public_key);
 }
 
+@view
+func isValidSignature{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
+}(hash: felt, signature_len: felt, signature: felt*) -> (isValid: felt) {
+    let (isValid) = is_valid_signature(hash, signature_len, signature);
+    return (isValid=isValid);
+}
 
 @view
 func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -65,14 +88,16 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    hash: felt, 
+    sig_len: felt,
+    sig: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
     calldata: felt*,
 ) {
     alloc_locals;
-    let (tx_info) = get_tx_info();
-    is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
+    is_valid_signature(hash, sig_len, sig);
     return ();
 }
 
@@ -87,22 +112,20 @@ func is_valid_signature{
     signature_len: felt,
     signature: felt*
 ) -> (is_valid: felt) {
-
-    with_attr error_message("StarkSigner: invalid signature length") {
-        assert signature_len = 3;
-    }
-    
     let (public_key) = StarkSigner_public_key.read();
 
-    let sig_r = signature[1];
-    let sig_s = signature[2];
+    with_attr error_message("StarkSigner: invalid signature length") {
+        assert signature_len = 2;
+    }
+
+    let sig_r = signature[0];
+    let sig_s = signature[1];
 
     verify_ecdsa_signature(
         message=hash,
         public_key=public_key,
         signature_r=sig_r,
-        signature_s=sig_s
-    );
+        signature_s=sig_s);
 
     return (is_valid=TRUE);
 }

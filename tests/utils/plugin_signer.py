@@ -108,4 +108,4 @@ class StarkPluginSigner(PluginSigner):
         self.public_key = stark_key.public_key
 
     def sign(self, message_hash: int) -> List[int]:
-        return [self.plugin_class_hash] + list(self.stark_key.sign(message_hash))
+        return [self.plugin_class_hash, 2] + list(self.stark_key.sign(message_hash))

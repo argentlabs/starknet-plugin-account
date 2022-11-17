@@ -58,21 +58,18 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
 @view
 func is_valid_signature{
-    syscall_ptr : felt*,
-    pedersen_ptr : HashBuiltin*,
-    range_check_ptr,
-    ecdsa_ptr: SignatureBuiltin*
-}(
-    hash: felt,
-    signature_len: felt,
-    signature: felt*
-) -> (is_valid: felt) {
-    return (is_valid=FALSE); // This plugin can only validate call
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
+}(hash: felt, signature_len: felt, signature: felt*) -> (is_valid: felt) {
+    return (is_valid=FALSE);  // This plugin can only validate call
 }
+
 @external
 func validate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
 }(
+    hash: felt,
+    sig_len: felt,
+    sig: felt*,
     call_array_len: felt,
     call_array: CallArray*,
     calldata_len: felt,
@@ -83,19 +80,20 @@ func validate{
     // get the tx info
     let (tx_info) = get_tx_info();
 
-     // parse the plugin data
+    // parse the plugin data
     with_attr error_message("SessionKey: invalid plugin data") {
-        let sig_r = tx_info.signature[1];
-        let sig_s = tx_info.signature[2];
-        let session_key = tx_info.signature[3];
-        let session_expires = tx_info.signature[4];
-        let root = tx_info.signature[5];
-        let proof_len = tx_info.signature[6];
-        let proofs_len = tx_info.signature[7];
-        let proofs = tx_info.signature + 8;
-        let session_token_offset = 8 + proofs_len;
-        let session_token_len = tx_info.signature[session_token_offset];
-        let session_token = tx_info.signature + session_token_offset + 1;
+        let sig_r = sig[0];
+        let sig_s = sig[1];
+        let session_key = sig[2];
+        let session_expires = sig[3];
+        let root = sig[4];
+        let proof_len = sig[5];
+        let proofs_len = sig[6];
+        let proofs = sig + 7;
+        let session_token_offset = 7 + proofs_len;
+        let session_token_len = sig[session_token_offset];
+        let session_token = sig + session_token_offset + 1;
+        let session_token_sig_len = sig[session_token_offset + 2];
     }
 
     with_attr error_message("SessionKey: invalid proof len") {
@@ -103,7 +101,17 @@ func validate{
     }
 
     with_attr error_message("SessionKey: invalid signature length") {
-        assert tx_info.signature_len = session_token_offset + 1 + session_token_len;
+        assert tx_info.signature_len = session_token_offset + 3 + session_token_len;
+    }
+
+    // check if the tx is signed by the session key
+    with_attr error_message("SessionKey: invalid signature") {
+        verify_ecdsa_signature(
+            message=tx_info.transaction_hash,
+            public_key=session_key,
+            signature_r=sig_r,
+            signature_s=sig_s,
+        );
     }
 
     with_attr error_message("SessionKey: session expired") {
@@ -113,7 +121,8 @@ func validate{
 
     let (session_hash) = compute_session_hash(
         session_key, session_expires, root, tx_info.chain_id, tx_info.account_contract_address
-    );    
+    );
+
     with_attr error_message("SessionKey: unauthorised session") {
         IAccount.isValidSignature(
             contract_address=tx_info.account_contract_address,
@@ -127,18 +136,23 @@ func validate{
         let (is_revoked) = SessionKey_revoked_keys.read(session_key);
         assert is_revoked = 0;
     }
-    // check if the tx is signed by the session key
-    with_attr error_message("SessionKey: invalid signature") {
-        verify_ecdsa_signature(
-            message=tx_info.transaction_hash,
-            public_key=session_key,
-            signature_r=sig_r,
-            signature_s=sig_s,
-        );
-    }
+
     check_policy(call_array_len, call_array, root, proof_len, proofs_len, proofs);
 
     return ();
+}
+
+@external
+func execute(call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*) -> (
+    call_array_len: felt,
+    call_array: CallArray*,
+    calldata_len: felt,
+    calldata: felt*,
+    response_len: felt,
+    response: felt*,
+) {
+    let (response: felt*) = alloc();
+    return (call_array_len, call_array, calldata_len, calldata, 0, response);
 }
 
 @external
@@ -152,9 +166,9 @@ func revokeSessionKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return ();
 }
 
-/////////////////////
+// ///////////////////
 // INTERNAL FUNCTIONS
-/////////////////////
+// ///////////////////
 
 func check_policy{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
@@ -277,7 +291,6 @@ func calc_merkle_root{pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (res) = calc_merkle_root(node, proof_len - 1, proof + 1);
     return (res,);
 }
-
 
 func assert_only_self{syscall_ptr: felt*}() -> () {
     let (self) = get_contract_address();
