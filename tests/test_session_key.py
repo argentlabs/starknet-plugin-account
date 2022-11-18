@@ -239,7 +239,7 @@ async def test_dapp_long_signature(starknet: Starknet, contracts):
     signed_tx.signature.extend([1, 1, 1, 1])
     await assert_revert(
         session_plugin_signer.send_signed_tx(signed_tx),
-        reverted_with="SessionKey: invalid signature length"
+        reverted_with="PluginAccount: Invalid signature format"
     )
 
     signed_tx = await session_plugin_signer.get_signed_transaction(
@@ -256,7 +256,7 @@ async def test_dapp_long_signature(starknet: Starknet, contracts):
 
     await assert_revert(
         session_plugin_signer.send_signed_tx(signed_tx),
-        reverted_with="SessionKey: invalid proof len"
+        reverted_with="PluginAccount: Invalid signature format"
     )
 
     assert (await dapp.get_balance().call()).result.res == 0

@@ -1,10 +1,12 @@
 from typing import Optional, List, Tuple
-from starkware.crypto.signature.signature import private_to_stark_key, sign
+from starkware.crypto.signature.signature import private_to_stark_key, sign, pedersen_hash
 from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.core.os.transaction_hash.transaction_hash import calculate_transaction_hash_common, TransactionHashPrefix
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.compiler.compile import get_selector_from_name
+from starkware.cairo.common.hash_chain import compute_hash_chain
+
 
 TRANSACTION_VERSION = 1
 
@@ -42,7 +44,7 @@ class BetterMulticallSigner():
             additional_data=[nonce],
         )
 
-        sig_r, sig_s = self.sign(transaction_hash)
+        sig_r, sig_s = self.sign(compute_hash_chain([3, plugin_validation[0], plugin_execution[0], transaction_hash]))
 
         # craft invoke and execute tx
         external_tx = InvokeFunction(

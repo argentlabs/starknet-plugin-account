@@ -12,6 +12,8 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import calcula
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction, Declare
+from starkware.cairo.common.hash_chain import compute_hash_chain
+
 
 AllowedCall = Tuple[int,str]
 # H('StarkNetDomain(chainId:felt)')
@@ -62,7 +64,7 @@ def build_session(signer, allowed_calls: List[AllowedCall], session_public_key: 
         account_address,
         message_hash
     ])
-    signed_hash = signer.sign(session_hash)
+    signed_hash = signer.signSessionKey(session_hash)
     return Session(
         session_public_key=session_public_key,
         session_expiration=session_expiration,
@@ -111,10 +113,13 @@ class SessionPluginSigner(PluginSigner):
             chain_id=StarknetChainId.TESTNET.value,
             additional_data=[nonce],
         )
+        hash = compute_hash_chain([2, self.plugin_class_hash, transaction_hash])
+        sig_r, sig_s = self.stark_key.sign(hash)
 
-        session_signature = self.stark_key.sign(transaction_hash)
+        print("sk", self.plugin_class_hash, hash)
+
         proofs_flat = [item for proof in proofs for item in proof]
-        sig = [*session_signature,          # session signature
+        sig = [sig_r, sig_s,          # session signature
             session.session_public_key,  # session_key
             session.session_expiration,  # expiration
             session.root,                # root

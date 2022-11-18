@@ -107,7 +107,7 @@ func validate{
     // check if the tx is signed by the session key
     with_attr error_message("SessionKey: invalid signature") {
         verify_ecdsa_signature(
-            message=tx_info.transaction_hash,
+            message=hash,
             public_key=session_key,
             signature_r=sig_r,
             signature_s=sig_s,

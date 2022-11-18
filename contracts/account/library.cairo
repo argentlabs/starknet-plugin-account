@@ -14,6 +14,7 @@ from starkware.starknet.common.syscalls import (
 from starkware.cairo.common.bool import TRUE, FALSE
 from contracts.account.IPluginAccount import CallArray
 from contracts.plugins.IPlugin import IPlugin
+from starkware.cairo.common.hash_chain import hash_chain
 
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
 
@@ -82,9 +83,30 @@ namespace PluginAccount {
 
         let (tx_info) = get_tx_info();
 
-        inner_validate(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata);
+        let (res) = alloc();
+        with_attr error_message("PluginAccount: Invalid signature format") {
+            let (id_len, id_list) = get_plugin_ids(tx_info.signature_len, tx_info.signature, 0, res);
+        }
+        let (to_hash: felt*) = alloc();
+        assert [to_hash] = id_len+1;
+        memcpy(dst=to_hash+1, src=id_list- id_len, len=id_len);
+        assert [to_hash + id_len + 1] = tx_info.transaction_hash;
+        let (hash) = hash_chain{hash_ptr=pedersen_ptr}(to_hash);
+
+        inner_validate(hash, tx_info.signature_len, tx_info.signature, call_array_len, call_array, calldata_len, calldata);
 
         return ();
+    }
+
+    func get_plugin_ids {
+        syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+    } (signature_len: felt, sig: felt*, res_len: felt, res: felt*) -> (res_len: felt, res: felt*) {
+        if (signature_len == 0) {
+            return (res_len, res);
+        }
+        assert [res] = sig[0];
+        let offset = sig[1] + 2;
+        return get_plugin_ids(signature_len - offset, sig + offset, res_len + 1, res + 1);
     }
 
     func inner_validate{

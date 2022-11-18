@@ -8,6 +8,8 @@ from starkware.starknet.services.api.gateway.transaction import InvokeFunction, 
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.compiler.compile import get_selector_from_name
 from utils.utils import from_call_to_call_array, StarkKeyPair, cached_contract, copy_contract_state
+from starkware.cairo.common.hash_chain import compute_hash_chain
+
 TRANSACTION_VERSION = 1
 
 
@@ -108,4 +110,9 @@ class StarkPluginSigner(PluginSigner):
         self.public_key = stark_key.public_key
 
     def sign(self, message_hash: int) -> List[int]:
+        hash_with_plugin_id = compute_hash_chain([2, self.plugin_class_hash, message_hash]);
+        return [self.plugin_class_hash, 2] + list(self.stark_key.sign(hash_with_plugin_id))
+
+    def signSessionKey(self, message_hash: int) -> List[int]:
         return [self.plugin_class_hash, 2] + list(self.stark_key.sign(message_hash))
+    
