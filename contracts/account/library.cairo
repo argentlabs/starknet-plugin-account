@@ -98,6 +98,12 @@ namespace PluginAccount {
         return ();
     }
 
+    // @dev get plugin ids from tx.signature
+    // @devfor instance a signature with many plugins looking like this
+    // @@param signature_len: tx.signature_len, used to stop the search of id
+    // @param sig: example like classHash1, 1 r, s, classHash2 , 0, classHash3, 3, r, s, v
+    // @param res_len used to return the length of the result
+    // @return res list of ids example (res_len = 3, res = [classHash1, classHash2, classHash3]
     func get_plugin_ids {
         syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
     } (signature_len: felt, sig: felt*, res_len: felt, res: felt*) -> (res_len: felt, res: felt*) {
@@ -109,6 +115,7 @@ namespace PluginAccount {
         return get_plugin_ids(signature_len - offset, sig + offset, res_len + 1, res + 1);
     }
 
+    // @dev lib call all validate function from plugins
     func inner_validate{
         syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
     }(
@@ -143,6 +150,7 @@ namespace PluginAccount {
         return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, call_array_len, call_array, calldata_len, calldata);
     }
 
+    // todo test and update with new signing
     func validate_deploy{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,

@@ -11,10 +11,7 @@ from starknet_py.cairo.felt import encode_shortstring
 key_pair = StarkKeyPair(1234)
 new_key_pair = StarkKeyPair(5678)
 
-
-# signer = StarkPluginSigner(1234)
 betterMulticallSigner = BetterMulticallSigner(1234)
-# new_signer = StarkPluginSigner(5678)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,7 +58,6 @@ def contract_factory(contract_classes, contract_init):
 
     account = build_contract(account, state=_state)
     nft = cached_contract(_state, nft_cls, nft)
-    # account_as_plugin = cached_contract(_state, sts_plugin_cls, account)
 
     stark_plugin_signer = StarkPluginSigner(
         stark_key=key_pair,
@@ -102,7 +98,7 @@ async def test_better_multicall(contract_factory):
 
     await stark_plugin_signer.add_plugin(plugin=bm_plugin_hash, plugin_arguments=[0])
 
-    mint = await betterMulticallSigner.send_transaction(
+    await betterMulticallSigner.send_transaction(
         account,
         [sts_plugin_hash, 2],
         [bm_plugin_hash, 0], 
@@ -111,7 +107,6 @@ async def test_better_multicall(contract_factory):
             (nft.contract_address, 'set_nft_name', 2, [ 1, 0, 0, encode_shortstring('aloha')]),
         ]) 
 
-    # LOGGER.critical(mint)
     execution_info = await nft.read_nft(0).call()
     assert execution_info.result.nft.owner == account.contract_address
     assert execution_info.result.nft.name == encode_shortstring('aloha')
