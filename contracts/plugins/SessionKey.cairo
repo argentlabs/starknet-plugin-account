@@ -3,20 +3,16 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.hash_state import (
-    HashState,
     hash_finalize,
     hash_init,
-    hash_update,
     hash_update_single,
 )
 from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.math_cmp import is_le_felt
-from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE, FALSE
-from starkware.cairo.common.math import assert_not_zero, assert_nn
+from starkware.cairo.common.math import assert_nn
 from starkware.starknet.common.syscalls import (
-    call_contract,
     get_tx_info,
     get_contract_address,
     get_caller_address,

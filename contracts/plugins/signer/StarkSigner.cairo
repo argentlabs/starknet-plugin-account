@@ -7,7 +7,6 @@ from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.alloc import alloc
 from contracts.account.library import CallArray
 from starkware.starknet.common.syscalls import (
-    get_tx_info,
     get_contract_address,
     get_caller_address,
 )

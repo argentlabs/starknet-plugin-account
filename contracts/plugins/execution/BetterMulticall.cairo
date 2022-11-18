@@ -5,10 +5,7 @@ from starkware.cairo.common.memcpy import memcpy
 from contracts.account.IPluginAccount import CallArray
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.syscalls import (
-    call_contract,
-    get_caller_address,
-    get_contract_address,
-    get_tx_info,
+    call_contract
 )
 
 // Enumeration of possible CallData prefix
