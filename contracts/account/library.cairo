@@ -17,6 +17,8 @@ from contracts.plugins.IPlugin import IPlugin
 from starkware.cairo.common.hash_chain import hash_chain
 
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
+const TRANSACTION_VERSION = 1;
+const QUERY_VERSION = 2**128 + TRANSACTION_VERSION;
 
 struct Call {
     to: felt,
@@ -79,9 +81,10 @@ namespace PluginAccount {
         call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
     ) {
         alloc_locals;
-        assert_initialized();
-
+        
         let (tx_info) = get_tx_info();
+        assert_correct_tx_version(tx_info.version);
+        assert_initialized();
 
         let (res) = alloc();
         with_attr error_message("PluginAccount: Invalid signature format") {
@@ -176,9 +179,9 @@ namespace PluginAccount {
     ) -> (response_len: felt, response: felt*) {
         alloc_locals;
 
-        assert_non_reentrant();
-
         let (tx_info) = get_tx_info();
+        assert_correct_tx_version(tx_info.version);
+        assert_non_reentrant();
 
         /////////////// TMP /////////////////////
         // parse inputs to an array of 'Call' struct
@@ -398,6 +401,13 @@ namespace PluginAccount {
 
         memcpy(response, plugin_response, plugin_response_len);
         return inner_execute(sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, plugin_call_array_len, plugin_call_array, plugin_calldata_len, plugin_calldata, response_len + plugin_response_len, response);
+    }
+
+    func assert_correct_tx_version{syscall_ptr: felt*}(tx_version: felt) -> () {
+        with_attr error_message("PluginAccount: invalid tx version") {
+            assert (tx_version - TRANSACTION_VERSION) * (tx_version - QUERY_VERSION) = 0;
+        }
+        return ();
     }
 
     // @notice Executes a list of contract calls recursively.

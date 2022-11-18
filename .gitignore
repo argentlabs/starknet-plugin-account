@@ -139,3 +139,6 @@ dmypy.json
 accounts.json
 node.json
 .idea
+
+# protostar
+.protostar_cache

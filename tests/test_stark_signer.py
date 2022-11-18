@@ -128,16 +128,16 @@ async def test_dapp_bad_signature(contracts):
     assert (await dapp.get_balance().call()).result.res == 0
 
 
-# @pytest.mark.asyncio
-# async def test_dapp_long_signature(contracts):
-#     account, stark_plugin_signer, sts_plugin_hash, dapp = contracts
-#     assert (await dapp.get_balance().call()).result.res == 0
+@pytest.mark.asyncio
+async def test_dapp_long_signature(contracts):
+    account, stark_plugin_signer, sts_plugin_hash, dapp = contracts
+    assert (await dapp.get_balance().call()).result.res == 0
 
-#     signed_tx = await stark_plugin_signer.get_signed_transaction(
-#         calls=[(dapp.contract_address, 'set_balance', [47])],
-#     )
-#     signed_tx.signature.extend([1, 1, 1, 1])
-#     await assert_revert(
-#         stark_plugin_signer.send_signed_tx(signed_tx)
-#     )
-#     assert (await dapp.get_balance().call()).result.res == 0
+    signed_tx = await stark_plugin_signer.get_signed_transaction(
+        calls=[(dapp.contract_address, 'set_balance', [47])],
+    )
+    signed_tx.signature.extend([1, 1, 1, 1])
+    await assert_revert(
+        stark_plugin_signer.send_signed_tx(signed_tx)
+    )
+    assert (await dapp.get_balance().call()).result.res == 0
