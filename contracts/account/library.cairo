@@ -15,6 +15,8 @@ from starkware.cairo.common.bool import TRUE, FALSE
 from contracts.account.IPluginAccount import CallArray
 
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
+const TRANSACTION_VERSION = 1;
+const QUERY_VERSION = 2**128 + TRANSACTION_VERSION;
 
 struct Call {
     to: felt,
@@ -101,10 +103,11 @@ namespace PluginAccount {
         call_array_len: felt, call_array: CallArray*, calldata_len: felt, calldata: felt*
     ) {
         alloc_locals;
-
+        
+        let (tx_info) = get_tx_info();
+        assert_correct_tx_version(tx_info.version);
         assert_initialized();
 
-        let (tx_info) = get_tx_info();
         let (plugin) = get_plugin_from_signature(tx_info.signature_len, tx_info.signature);
 
         IPlugin.library_call_validate(
@@ -142,9 +145,9 @@ namespace PluginAccount {
     ) -> (response_len: felt, response: felt*) {
         alloc_locals;
 
-        assert_non_reentrant();
-
         let (tx_info) = get_tx_info();
+        assert_correct_tx_version(tx_info.version);
+        assert_non_reentrant();
 
         /////////////// TMP /////////////////////
         // parse inputs to an array of 'Call' struct
@@ -310,6 +313,13 @@ namespace PluginAccount {
         let (initialized) = PluginAccount_initialized.read();
         with_attr error_message("PluginAccount: account not initialized") {
             assert_not_zero(initialized);
+        }
+        return ();
+    }
+
+    func assert_correct_tx_version{syscall_ptr: felt*}(tx_version: felt) -> () {
+        with_attr error_message("PluginAccount: invalid tx version") {
+            assert (tx_version - TRANSACTION_VERSION) * (tx_version - QUERY_VERSION) = 0;
         }
         return ();
     }
