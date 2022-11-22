@@ -116,8 +116,6 @@ class SessionPluginSigner(PluginSigner):
         hash = compute_hash_chain([2, self.plugin_class_hash, transaction_hash])
         sig_r, sig_s = self.stark_key.sign(hash)
 
-        print("sk", self.plugin_class_hash, hash)
-
         proofs_flat = [item for proof in proofs for item in proof]
         sig = [sig_r, sig_s,          # session signature
             session.session_public_key,  # session_key
