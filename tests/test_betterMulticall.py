@@ -126,6 +126,3 @@ async def test_better_multicall_alone(contract_factory):
                 (nft.contract_address, 'set_nft_name', 2, [ 1, 0, 0, encode_shortstring('aloha')]),
             ]) 
     )
-    execution_info = await nft.read_nft(0).call()
-    assert execution_info.result.nft.owner == account.contract_address
-    assert execution_info.result.nft.name == encode_shortstring('aloha')

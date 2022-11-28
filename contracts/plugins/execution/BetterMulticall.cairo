@@ -30,6 +30,9 @@ func validate{
     calldata_len: felt,
     calldata: felt*,
 ) {
+    with_attr error_message("BetterMultiCall: cannot be used to validate transaction") {
+        assert 1 = 2;
+    }
     return ();
 }
 

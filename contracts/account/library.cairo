@@ -132,10 +132,6 @@ namespace PluginAccount {
     ) {
         alloc_locals;
 
-        if (sig_len == 0) {
-            return ();
-        }
-
         let plugin_id = sig[0];
         let plugin_sig_len = sig[1];
 
@@ -150,7 +146,9 @@ namespace PluginAccount {
             calldata=calldata,
         );
 
-        return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, call_array_len, call_array, calldata_len, calldata);
+        // removed all plugin validation, only the first plugin validate the transaction.
+        // return inner_validate(hash, sig_len - plugin_sig_len - 2, sig + plugin_sig_len + 2, call_array_len, call_array, calldata_len, calldata);
+        return ();
     }
 
     // todo test and update with new signing
