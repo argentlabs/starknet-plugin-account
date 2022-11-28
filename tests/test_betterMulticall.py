@@ -2,9 +2,9 @@ import pytest
 import asyncio
 import logging
 from starkware.starknet.testing.starknet import Starknet
-from utils.utils import str_to_felt, cached_contract, build_contract, StarkKeyPair, compile 
+from utils.utils import str_to_felt, cached_contract, build_contract, StarkKeyPair, compile, assert_revert
 from utils.plugin_signer import StarkPluginSigner
-from utils.better_multicall_signer import BetterMulticallSigner
+from utils.better_multicall_signer import BetterMulticallSigner, BetterMulticallSignerFake
 from starknet_py.cairo.felt import encode_shortstring
 
 
@@ -12,6 +12,7 @@ key_pair = StarkKeyPair(1234)
 new_key_pair = StarkKeyPair(5678)
 
 betterMulticallSigner = BetterMulticallSigner(1234)
+betterMulticallSignerFake = BetterMulticallSignerFake(12345)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -107,6 +108,24 @@ async def test_better_multicall(contract_factory):
             (nft.contract_address, 'set_nft_name', 2, [ 1, 0, 0, encode_shortstring('aloha')]),
         ]) 
 
+    execution_info = await nft.read_nft(0).call()
+    assert execution_info.result.nft.owner == account.contract_address
+    assert execution_info.result.nft.name == encode_shortstring('aloha')
+
+@pytest.mark.asyncio
+async def test_better_multicall_alone(contract_factory):
+    account, stark_plugin_signer, nft, sts_plugin_hash, bm_plugin_hash = contract_factory
+
+    await stark_plugin_signer.add_plugin(plugin=bm_plugin_hash, plugin_arguments=[0])
+    await assert_revert(
+        betterMulticallSignerFake.send_transaction(
+            account,
+            [bm_plugin_hash, 0], 
+            calls=[
+                (nft.contract_address, 'mint_nft', 0, []),
+                (nft.contract_address, 'set_nft_name', 2, [ 1, 0, 0, encode_shortstring('aloha')]),
+            ]) 
+    )
     execution_info = await nft.read_nft(0).call()
     assert execution_info.result.nft.owner == account.contract_address
     assert execution_info.result.nft.name == encode_shortstring('aloha')
