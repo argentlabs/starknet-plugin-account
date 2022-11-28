@@ -1,5 +1,6 @@
 from starkware.cairo.common.hash_state import compute_hash_on_elements
 from typing import Optional, List, Tuple
+import logging
 from utils.merkle_utils import get_leaves, generate_merkle_root, generate_merkle_proof
 from starkware.starknet.compiler.compile import get_selector_from_name
 from utils.utils import str_to_felt
@@ -11,6 +12,8 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import calcula
 from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction, Declare
+from starkware.cairo.common.hash_chain import compute_hash_chain
+
 
 AllowedCall = Tuple[int,str]
 # H('StarkNetDomain(chainId:felt)')
@@ -20,6 +23,7 @@ SESSION_TYPE_HASH = 0x1aa0e1c56b45cf06a54534fa1707c54e520b842feb21d03b7deddb6f1e
 # H(Policy(contractAddress:felt,selector:selector))
 POLICY_TYPE_HASH = 0x2f0026e78543f036f33e26a8f5891b88c58dc1e20cbbfaf0bb53274da6fa568
 
+LOGGER = logging.getLogger(__name__)
 
 # Returns the tree root and proofs for each allowed call
 def generate_policy_tree(allowed_calls : List[AllowedCall]) -> Tuple[int, List[List[int]]]:
@@ -60,7 +64,7 @@ def build_session(signer, allowed_calls: List[AllowedCall], session_public_key: 
         account_address,
         message_hash
     ])
-    signed_hash = signer.sign(session_hash)
+    signed_hash = signer.signSessionKey(session_hash)
     return Session(
         session_public_key=session_public_key,
         session_expiration=session_expiration,
@@ -109,12 +113,11 @@ class SessionPluginSigner(PluginSigner):
             chain_id=StarknetChainId.TESTNET.value,
             additional_data=[nonce],
         )
+        hash = compute_hash_chain([2, self.plugin_class_hash, transaction_hash])
+        sig_r, sig_s = self.stark_key.sign(hash)
 
-        session_signature = self.stark_key.sign(transaction_hash)
         proofs_flat = [item for proof in proofs for item in proof]
-        signature = [
-            self.plugin_class_hash,
-            *session_signature,          # session signature
+        sig = [sig_r, sig_s,          # session signature
             session.session_public_key,  # session_key
             session.session_expiration,  # expiration
             session.root,                # root
@@ -122,7 +125,11 @@ class SessionPluginSigner(PluginSigner):
             len(proofs_flat),            # proofs_len
             *proofs_flat,                # proofs
             len(session.session_token),  # session_token_len
-            *session.session_token       # session_token
+            *session.session_token]       # session_token
+        signature = [
+            self.plugin_class_hash,
+            len(sig),
+            *sig
         ]
 
         return InvokeFunction(
