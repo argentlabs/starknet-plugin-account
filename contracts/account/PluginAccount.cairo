@@ -58,7 +58,7 @@ func __validate_declare__{
 } (
     class_hash: felt
 ) {
-    // todo
+    PluginAccount.validate_declare();
     return ();
 }
 
