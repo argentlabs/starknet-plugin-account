@@ -135,6 +135,21 @@ namespace PluginAccount {
         return ();
     }
 
+    func validate_declare{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        ecdsa_ptr: SignatureBuiltin*,
+        range_check_ptr
+    }() {
+        alloc_locals;
+        let (tx_info) = get_tx_info();
+        let (is_valid) = is_valid_signature(tx_info.transaction_hash, tx_info.signature_len, tx_info.signature);
+        with_attr error_message("PluginAccount: invalid declare") {
+            assert_not_zero(is_valid);
+        }
+        return ();
+    }
+
     func execute{
         syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
     }(
