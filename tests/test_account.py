@@ -31,7 +31,7 @@ async def account_setup(starknet: Starknet):
     account_cls = compile('contracts/account/PluginAccount.cairo')
     sts_plugin_cls = compile("contracts/plugins/signer/StarkSigner.cairo")
     sts_plugin_decl = await starknet.declare(contract_class=sts_plugin_cls)
-
+    
     account = await starknet.deploy(contract_class=account_cls, constructor_calldata=[])
     await account.initialize(sts_plugin_decl.class_hash, [signer_key.public_key]).execute()
 
@@ -41,11 +41,16 @@ async def account_setup(starknet: Starknet):
 
 
 @pytest.fixture(scope='module')
+async def va_plugin_setup(starknet: Starknet):
+    va_plugin_cls = compile("contracts/test/plugins/validateAll.cairo")
+    va_plugin_decl = await starknet.declare(contract_class=va_plugin_cls)
+    return va_plugin_decl
+
+@pytest.fixture(scope='module')
 async def session_plugin_setup(starknet: Starknet):
     session_key_cls = compile('contracts/plugins/SessionKey.cairo')
     session_key_decl = await starknet.declare(contract_class=session_key_cls)
     return session_key_decl
-
 
 @pytest.fixture(scope='module')
 async def dapp_setup(starknet: Starknet):
@@ -95,15 +100,32 @@ async def test_addPlugin(network):
 
 
 @pytest.mark.asyncio
-async def test_removePlugin(network):
+async def test_removePlugin(network, va_plugin_setup):
     account, stark_plugin_signer, stark_plugin_signer_2, session_plugin_signer, dapp = network
     plugin_class_hash = session_plugin_signer.plugin_class_hash
+    stark_signer_cls_hash = stark_plugin_signer.plugin_class_hash
+    va_class_hash = va_plugin_setup.class_hash
     assert (await account.isPlugin(plugin_class_hash).call()).result.success == 0
     await stark_plugin_signer.add_plugin(plugin_class_hash)
     assert (await account.isPlugin(plugin_class_hash).call()).result.success == 1
     await stark_plugin_signer.remove_plugin(plugin_class_hash)
     assert (await account.isPlugin(plugin_class_hash).call()).result.success == 0
 
+    await stark_plugin_signer.add_plugin(va_class_hash)
+    signed_tx = await stark_plugin_signer.get_signed_transaction(
+        calls=[(account.contract_address, 'removePlugin', [stark_signer_cls_hash, 0])],
+    )
+    signed_tx.signature[0] = va_class_hash
+    await stark_plugin_signer.send_signed_tx(signed_tx)
+    
+    signed_tx = await stark_plugin_signer.get_signed_transaction(
+        calls=[(account.contract_address, 'addPlugin', [stark_signer_cls_hash, 0])],
+    )
+    signed_tx.signature[0] = va_class_hash
+    await stark_plugin_signer.send_signed_tx(signed_tx)
+
+    read_execution_info = await stark_plugin_signer.read_on_plugin("getPublicKey")
+    assert read_execution_info.result[0] == [0]
 
 @pytest.mark.asyncio
 async def test_supportsInterface(network):

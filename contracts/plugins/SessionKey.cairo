@@ -56,6 +56,11 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (FALSE,);
 }
 
+@external
+func uninstall{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin_data_len: felt, plugin_data: felt*) {
+    return ();
+}
+
 @view
 func is_valid_signature{
     syscall_ptr : felt*,

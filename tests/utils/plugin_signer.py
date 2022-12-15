@@ -94,8 +94,10 @@ class PluginSigner:
             plugin_arguments = []
         return await self.send_transaction([(self.account.contract_address, 'addPlugin', [plugin, len(plugin_arguments), *plugin_arguments])])
 
-    async def remove_plugin(self, plugin: int):
-        return await self.send_transaction([(self.account.contract_address, 'removePlugin', [plugin])])
+    async def remove_plugin(self, plugin: int, plugin_arguments=None):
+        if plugin_arguments is None:
+            plugin_arguments = []
+        return await self.send_transaction([(self.account.contract_address, 'removePlugin', [plugin, len(plugin_arguments), *plugin_arguments])])
     
     async def getVersion(self):
         return await self.send_transaction([(self.account.contract_address, 'getVersion', [])])
