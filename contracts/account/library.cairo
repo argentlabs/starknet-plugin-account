@@ -13,6 +13,7 @@ from starkware.starknet.common.syscalls import (
 )
 from starkware.cairo.common.bool import TRUE, FALSE
 from contracts.account.IPluginAccount import CallArray
+from contracts.plugins.IPlugin import IPlugin
 
 const ERC165_ACCOUNT_INTERFACE_ID = 0x3943f10f;
 const TRANSACTION_VERSION = 1;
@@ -23,30 +24,6 @@ struct Call {
     selector: felt,
     calldata_len: felt,
     calldata: felt*,
-}
-
-/////////////////////
-// INTERFACES
-/////////////////////
-
-@contract_interface
-namespace IPlugin {
-    func initialize(data_len: felt, data: felt*) {
-    }
-
-    func is_valid_signature(hash: felt, sig_len: felt, sig: felt*) -> (isValid: felt) {
-    }
-
-    func supportsInterface(interfaceId: felt) -> (success: felt) {
-    }
-
-    func validate(
-        call_array_len: felt,
-        call_array: CallArray*,
-        calldata_len: felt,
-        calldata: felt*,
-    ) {
-    }
 }
 
 /////////////////////
@@ -198,7 +175,9 @@ namespace PluginAccount {
         return ();
     }
 
-    func remove_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) {
+    func remove_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        plugin: felt,plugin_calldata_len: felt, plugin_calldata: felt*
+    ) {
         assert_only_self();
 
         let (is_plugin) = PluginAccount_plugins.read(plugin);
@@ -212,6 +191,8 @@ namespace PluginAccount {
         with_attr error_message("PluginAccount: plugin can't remove itself") {
             assert_not_equal(signature_plugin, plugin);
         }
+
+        uninstall_plugin(plugin, plugin_calldata_len, plugin_calldata);
 
         PluginAccount_plugins.write(plugin, 0);
         return ();
@@ -286,6 +267,17 @@ namespace PluginAccount {
             data=plugin_calldata,
         );
 
+        return ();
+    }
+
+    func uninstall_plugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+        plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*
+    ) {
+        IPlugin.library_call_uninstall(
+            class_hash=plugin,
+            data_len=plugin_calldata_len,
+            data=plugin_calldata,
+        );
         return ();
     }
 

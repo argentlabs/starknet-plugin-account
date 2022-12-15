@@ -81,8 +81,8 @@ func addPlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 }
 
 @external
-func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt) {
-    PluginAccount.remove_plugin(plugin);
+func removePlugin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(plugin: felt, plugin_calldata_len: felt, plugin_calldata: felt*) {
+    PluginAccount.remove_plugin(plugin, plugin_calldata_len, plugin_calldata);
     return ();
 }
 
