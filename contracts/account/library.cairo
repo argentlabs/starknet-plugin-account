@@ -91,9 +91,6 @@ namespace PluginAccount {
 
         initialize_plugin(plugin, plugin_calldata_len, plugin_calldata);
 
-        let (self) = get_contract_address();
-        account_created.emit(self);
-
         return ();
     }
 
